@@ -584,6 +584,14 @@ async function initConfig() {
   });
 }
 
+// Surface runtime errors — a silent exception reads as "clicks do nothing".
+window.addEventListener("error", (event) => {
+  toast(`JS error: ${event.message} (${(event.filename || "").split("/").pop()}:${event.lineno})`);
+});
+window.addEventListener("unhandledrejection", (event) => {
+  toast(`Unhandled rejection: ${event.reason}`);
+});
+
 initConfig();
 // Links inside rendered markdown must not navigate the webview; hand them
 // to the system browser instead.

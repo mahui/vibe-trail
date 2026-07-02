@@ -63,21 +63,24 @@ pub fn resume(spec: &ResumeSpec, terminal: TerminalKind) -> Result<Option<String
                 }
                 return Ok(None);
             }
-            run_osascript(&format!(
-                "set the clipboard to \"{}\"",
-                applescript_escape(&shell_command)
-            ))?;
-            run_osascript("tell application \"Ghostty\" to activate")?;
+            // pbcopy + open -a: no AppleEvents involved, so no Automation
+            // permission — an unsigned dev build loses its TCC grant on
+            // every rebuild and the OS then denies silently.
+            set_clipboard(&shell_command)?;
+            let status = Command::new("/usr/bin/open")
+                .args(["-a", "Ghostty"])
+                .status()
+                .map_err(|e| Error::Data(format!("Failed to activate Ghostty: {e}")))?;
+            if !status.success() {
+                return Err(Error::Data("Failed to activate Ghostty".to_string()));
+            }
             Ok(Some(
                 "Ghostty is running — the resume command is on your clipboard; paste it into a new tab. (Ghostty's automation API is still a preview and unstable when driven directly.)"
                     .to_string(),
             ))
         }
         TerminalKind::Warp => {
-            run_osascript(&format!(
-                "set the clipboard to \"{}\"",
-                applescript_escape(&shell_command)
-            ))?;
+            set_clipboard(&shell_command)?;
             let url = format!(
                 "warp://action/new_window?path={}",
                 url_encode(&spec.project_path)
@@ -96,6 +99,26 @@ pub fn resume(spec: &ResumeSpec, terminal: TerminalKind) -> Result<Option<String
                     .to_string(),
             ))
         }
+    }
+}
+
+fn set_clipboard(text: &str) -> Result<()> {
+    use std::io::Write;
+    let mut child = Command::new("/usr/bin/pbcopy")
+        .stdin(std::process::Stdio::piped())
+        .spawn()
+        .map_err(|e| Error::Data(format!("Failed to run pbcopy: {e}")))?;
+    child
+        .stdin
+        .as_mut()
+        .ok_or_else(|| Error::Data("pbcopy stdin unavailable".to_string()))?
+        .write_all(text.as_bytes())
+        .map_err(|e| Error::Data(e.to_string()))?;
+    let status = child.wait().map_err(|e| Error::Data(e.to_string()))?;
+    if status.success() {
+        Ok(())
+    } else {
+        Err(Error::Data("pbcopy failed".to_string()))
     }
 }
 
