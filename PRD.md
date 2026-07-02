@@ -1,8 +1,8 @@
 # PRD — VibeTrail
 
-**版本:** v0.3
+**版本:** v0.4
 **日期:** 2026-07-02
-**状态:** 待评审
+**状态:** v1.2 已交付(P0+P1 全量),持续迭代
 **形态:** 开源项目(macOS App(Tauri)+ CLI,Rust workspace)
 
 ---
@@ -36,12 +36,12 @@ macOS 上的 coding agent 重度用户(每天多个 session、多项目、可能
 
 ## 5. Provider 路线图
 
-| 版本 | Provider | 说明 |
-|------|----------|------|
-| v1 | Claude Code | 全能力(浏览/搜索/resume) |
-| v1.1 | Codex | 纯文件读取(含 .zst 解压),验证 Provider 抽象 |
-| v1.2 | Antigravity | Experimental,仅读 brain/ 下 JSONL 部分;.pb/LanguageServer 依赖宿主进程,不做 |
-| 后续 | 社区贡献 | Provider 协议开放,接受 PR |
+| 版本 | Provider | 说明 | 状态 |
+|------|----------|------|------|
+| v1 | Claude Code | 全能力(浏览/搜索/resume) | ✅ |
+| v1.1 | Codex | 纯文件读取(含 .zst 解压),验证 Provider 抽象 | ✅ |
+| v1.2 | Antigravity | Experimental,仅读 brain/ 下 JSONL 部分;.pb/LanguageServer 依赖宿主进程,不做 | ✅ |
+| 后续 | 社区贡献 | Provider 协议开放,接受 PR(见 CONTRIBUTING.md) | 开放 |
 
 原则:能纯文件读取就支持;需要宿主进程活着或逆向私有格式的,降级或不做,不为最弱的 provider 污染架构承诺。
 
@@ -58,11 +58,19 @@ macOS 上的 coding agent 重度用户(每天多个 session、多项目、可能
 | F5 | 一键 Resume | 仅对 capability 声明可 resume 的 provider 显示。GUI:打开配置的终端执行 resume 命令;CLI:直接 exec。resume 前校验项目路径存在。 |
 | F6 | CLI | `vibetrail projects/sessions/search/show/resume/open`,查询类支持 `--json`。 |
 
-### P1(视工期)
+### P1(已交付)
 
-- subagent 会话树状展示(CC provider 特有)
-- token / cost 统计(UUID 去重后累加)
-- 终端选择配置(Terminal.app / iTerm2 / Warp / Ghostty)
+- ✅ subagent 会话树状展示(CC provider 特有;Codex 的 multi-agent worker 线程同样归属父会话)
+- ✅ token 统计(UUID 去重后累加;cost 换算刻意不做——定价表随模型漂移,token 不会)
+- ✅ 终端选择配置(Terminal.app / iTerm2 / Ghostty 直接执行;Warp 无可脚本化执行面,降级为定位目录 + 命令入剪贴板)
+
+### 交付后增量(用户反馈驱动)
+
+- resume/fork 链聚合:续会话/fork/subagent 线程折叠到根会话下(GUI ⑂ 徽标,CLI ↳ 标记)
+- 会话正文 markdown 渲染(DOMPurify 消毒;链接跳系统浏览器)
+- session id 展示与一键复制(列表短 id 芯片 + 详情完整 id 独立行)
+- 超长 tool 输出:预览 2000 字符 + 按需加载全文
+- 会话列表持续加载(50/页无限滚动);搜索结果点击不再关闭结果列表
 
 ### 非目标(v1 明确不做)
 

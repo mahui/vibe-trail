@@ -81,6 +81,7 @@ pub trait Provider: Send + Sync {
     fn resume_spec(&self, raw: &RawSession) -> Option<ResumeSpec>; // None = 不可 resume;只依赖元数据,禁止全量 parse
     fn quick_title(&self, raw: &RawSession) -> Option<String>; // 元数据级标题提取(项目总览用);默认实现回退全量 parse
     fn find(&self, reference: &str) -> Result<Vec<RawSession>>; // 按 native id/前缀定位;默认 discover+filter,id 在文件名里的 provider(Codex)覆写为纯目录走查
+    fn message_full(&self, raw: &RawSession, message_uuid: &str) -> Result<Option<Message>>; // 单条消息的未截断版本,按需重读磁盘(tool result 展示层截断在 2000 字符)
     fn summarize(&self, raw: &RawSession) -> Result<SessionSummary>; // 默认实现 = parse().summary
     // 搜索适配(可 grep 的 provider 覆写;默认空 → 该 provider 不参与全文搜索)
     fn search_roots(&self, project_path: Option<&str>) -> Vec<PathBuf>;
@@ -157,6 +158,7 @@ entry 解析 → 分类过滤 → 消息重组 → 树重建 → 展示转换
 
 ```rust
 struct Project        { id, real_path, exists, session_count, last_active, last_prompt?, providers: BTreeSet<String> }
+struct RawSession     { provider_id, native_id, file_path, project_path, mtime, file_size, parent_native_id? } // 可序列化:壳层持有分页句柄;parent 承载 resume/fork 链
 struct SessionSummary { id, provider_id, native_id, project_path, title, mtime, message_count, git_branch?, duration }
 struct Session        { summary, messages: Vec<Message>, extensions: Map<String, Value> }
 struct Message        { uuid, parent_uuid?, role, blocks: Vec<ContentBlock>, timestamp }
@@ -202,12 +204,14 @@ tool call / result / thinking 折叠为单行摘要,点击展开;超长 tool res
 
 ## 8. 性能预算
 
-| 场景 | 预算 | 手段 |
-|------|------|------|
-| 冷启动 → 项目总览 | < 500ms | discover 只读目录元数据 + 首行/首块,不全文解析 |
-| 会话列表 | < 300ms | mtime 排序 |
-| 全局搜索(数百 MB) | < 1s | grep-searcher;zst 部分允许放宽或延迟 |
-| 打开 5MB 会话 | 首屏 < 500ms | outline 先行 + 分页 |
+| 场景 | 预算(数百 session/数百 MB 规模) | 手段 | 实测(本机 2 万 session / 3.4GB,release) |
+|------|------|------|------|
+| 冷启动 → 项目总览 | < 500ms | discover 只读目录元数据 + 首行/首块,不全文解析;rayon 并行 | 1.4s(规模超预算基准 50×) |
+| 会话列表 | < 300ms | 发现与摘要拆分:句柄一次取回,摘要按 50/页并行 parse | 首页 ~0.7s(717 会话项目) |
+| 全局搜索 | < 1s | grep 引擎并行 + provider 并行 + 500 命中熔断;项目内搜索收窄到文件级 | 常见词 0.1s;稀有词全库 2.2s(= rg 地板);项目内 0.5–2.1s |
+| 打开大会话 | 首屏 < 500ms | 时间线 200 条/块懒渲染;tool result 截断 2000 字符 + 按需取全文 | 打开会话 0.06s |
+
+单次操作成本纪律:打开一个会话禁止全店 discover(`find` 短路)、禁止全量 parse(resume 走元数据、can_resume 零 IO)。
 
 ## 9. 测试策略
 

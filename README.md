@@ -14,6 +14,10 @@ projects and all agents — and jump back into any of them with one click.
 > any other agent vendor. It only reads the session files those tools already
 > store on your machine, strictly read-only.
 
+<p align="center">
+  <img src="assets/screenshot.png" alt="VibeTrail screenshot (demo data)" width="720" />
+</p>
+
 ## Why
 
 Coding agents scatter session history across private local directories and
@@ -29,6 +33,25 @@ closes the loop: **browse → search → resume**.
   directly.
 - **Two entry points.** A macOS app (Tauri) and a `vibetrail` CLI (JSON
   output for scripting).
+
+## Features
+
+- **Project overview** — every project you've ever run an agent in, across
+  all providers, grouped by working directory. Orphaned paths are flagged.
+- **Session browsing** — infinite-scroll session lists with copyable session
+  ids; resume/fork chains (continued sessions, Codex forks, multi-agent
+  worker threads) fold under their root session.
+- **Timeline** — markdown-rendered conversation, collapsed tool call /
+  result / thinking blocks, token totals, subagent trees, Antigravity
+  artifacts. Long tool outputs preview at 2000 chars with full text on
+  demand.
+- **Search** — full-text across every provider and project (ripgrep engine
+  linked in, no external binary), project scoping, jump-to-message anchors;
+  results stay open while you browse hits.
+- **Resume** — one click reopens the session in Terminal.app, iTerm2,
+  Ghostty, or Warp, in the right directory, with the right agent command.
+- **Scriptable** — every query command takes `--json` with a stable,
+  snapshot-tested schema.
 
 ## Status
 
@@ -90,13 +113,25 @@ clipboard.
 - The GUI's resume uses macOS Automation (osascript → Terminal); you will be
   asked for permission on first use.
 
+## Development
+
+```sh
+cargo test --workspace                                  # fixture parity tests + --json snapshots
+cargo clippy --workspace --all-targets -- -D warnings   # CI runs this
+cargo fmt --all --check
+```
+
+Architecture, ADRs, provider protocol, and per-provider format notes live in
+[`TECH_SPEC.md`](TECH_SPEC.md); requirements in [`PRD.md`](PRD.md); release
+notes in [`CHANGELOG.md`](CHANGELOG.md).
+
 ## Contributing
 
 Provider implementations are self-contained under
 `crates/vibetrail-core/src/providers/`. New providers are welcome — the bar is
 that all capabilities must work by reading files only (no host process, no
-reverse-engineered binary formats). See `TECH_SPEC.md` for the provider
-protocol and parsing rules.
+reverse-engineered binary formats). See [`CONTRIBUTING.md`](CONTRIBUTING.md)
+for the provider implementation guide and workflow rules.
 
 ## License
 
