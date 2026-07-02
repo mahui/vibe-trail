@@ -96,6 +96,29 @@ fn open_external(url: String) -> Result<(), String> {
         })
 }
 
+/// Clipboard via pbcopy: the webview's navigator.clipboard is not reliable
+/// in a custom-protocol context.
+#[tauri::command]
+fn copy_to_clipboard(text: String) -> Result<(), String> {
+    use std::io::Write;
+    let mut child = std::process::Command::new("/usr/bin/pbcopy")
+        .stdin(std::process::Stdio::piped())
+        .spawn()
+        .map_err(|e| e.to_string())?;
+    child
+        .stdin
+        .as_mut()
+        .ok_or("pbcopy stdin unavailable")?
+        .write_all(text.as_bytes())
+        .map_err(|e| e.to_string())?;
+    let status = child.wait().map_err(|e| e.to_string())?;
+    if status.success() {
+        Ok(())
+    } else {
+        Err("pbcopy failed".to_string())
+    }
+}
+
 #[tauri::command]
 fn get_config() -> config::AppConfig {
     config::load()
@@ -117,6 +140,7 @@ fn main() {
             can_resume,
             resume_session,
             open_external,
+            copy_to_clipboard,
             get_config,
             set_config,
         ])

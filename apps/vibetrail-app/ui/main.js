@@ -47,6 +47,25 @@ function compact(n) {
   return String(n);
 }
 
+async function copySessionId(nativeId) {
+  try {
+    await invoke("copy_to_clipboard", { text: nativeId });
+    toast(`Session id copied: ${nativeId}`, true);
+  } catch (error) {
+    toast(String(error));
+  }
+}
+
+function idChip(nativeId) {
+  const chip = text("span", "id-chip", nativeId.slice(0, 8));
+  chip.title = `${nativeId}\nClick to copy`;
+  chip.addEventListener("click", (event) => {
+    event.stopPropagation();
+    copySessionId(nativeId);
+  });
+  return chip;
+}
+
 function providerLabel(id) {
   return id === "antigravity" ? "antigravity (exp)" : id;
 }
@@ -120,8 +139,11 @@ function sessionRow(session) {
   li.dataset.id = session.id;
   li.append(text("div", "title", session.title));
   const branch = session.gitBranch ? ` · ${session.gitBranch}` : "";
-  li.append(text("div", "meta",
-    `${providerLabel(session.providerId)} · ${relativeTime(session.mtime)} · ${session.messageCount} msg${branch}`));
+  const meta = text("div", "meta");
+  meta.append(idChip(session.nativeId));
+  meta.append(text("span", "",
+    ` ${providerLabel(session.providerId)} · ${relativeTime(session.mtime)} · ${session.messageCount} msg${branch}`));
+  li.append(meta);
   li.addEventListener("click", () => selectSession(session.id, li));
   return li;
 }
@@ -226,16 +248,19 @@ function blockNode(block) {
 async function loadDetail(sessionId) {
   const session = await call("get_session", { sessionId });
   const summary = session.summary;
-  let sub = `${summary.projectPath} · ${summary.messageCount} messages`;
+  let sub = ` · ${summary.projectPath} · ${summary.messageCount} messages`;
   const usage = session.extensions && session.extensions.usage;
   if (usage) {
     sub += ` · tokens ↑${compact(usage.inputTokens + usage.cacheCreationTokens + usage.cacheReadTokens)} ↓${compact(usage.outputTokens)}`;
   }
   el.title.classList.remove("placeholder");
+  const subLine = text("span", "sub");
+  subLine.append(idChip(summary.nativeId));
+  subLine.append(text("span", "", sub));
   el.title.replaceChildren(
     text("span", "", summary.title),
     document.createElement("br"),
-    text("span", "sub", sub),
+    subLine,
   );
   el.timeline.replaceChildren();
   const artifacts = session.extensions && session.extensions.artifacts;
