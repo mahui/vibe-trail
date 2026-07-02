@@ -1,0 +1,72 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  app:
+    name: Signed & notarized app (universal dmg)
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin, x86_64-apple-darwin
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Build, sign, notarize, and attach dmg
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Developer ID signing (base64-encoded .p12 + its password).
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          # Notarization via Apple ID + app-specific password.
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        with:
+          projectPath: apps/vibetrail-app
+          args: --target universal-apple-darwin
+          tagName: ${{ github.ref_name }}
+          releaseName: VibeTrail ${{ github.ref_name }}
+          releaseBody: See CHANGELOG.md for details.
+          releaseDraft: true
+
+  cli:
+    name: CLI binary (universal)
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin, x86_64-apple-darwin
+      - uses: Swatinem/rust-cache@v2
+      - name: Build universal CLI
+        run: |
+          cargo build --release -p vibetrail-cli --target aarch64-apple-darwin
+          cargo build --release -p vibetrail-cli --target x86_64-apple-darwin
+          lipo -create \
+            target/aarch64-apple-darwin/release/vibetrail \
+            target/x86_64-apple-darwin/release/vibetrail \
+            -output vibetrail
+          tar -czf vibetrail-cli-${{ github.ref_name }}-macos-universal.tar.gz vibetrail
+      - name: Attach to release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release upload "${{ github.ref_name }}" \
+            vibetrail-cli-${{ github.ref_name }}-macos-universal.tar.gz \
+            --clobber || \
+          gh release create "${{ github.ref_name }}" \
+            vibetrail-cli-${{ github.ref_name }}-macos-universal.tar.gz \
+            --draft --title "VibeTrail ${{ github.ref_name }}" \
+            --notes "See CHANGELOG.md for details."

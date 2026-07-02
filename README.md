@@ -72,12 +72,12 @@ closes the loop: **browse → search → resume**.
 | Codex | ✅ | browse / search / resume, incl. `.jsonl.zst` |
 | Antigravity | ✅ experimental | browse / search / artifacts (no resume) |
 
-## Requirements
+## Install
 
-- macOS 14+ (primary target; the core and CLI are portable Rust)
-- Rust toolchain (to build from source)
+**Download** — grab the signed & notarized `.dmg` (GUI) or the CLI tarball
+from [Releases](https://github.com/mahui/vibe-trail/releases). macOS 14+.
 
-## Build
+**Build from source** — requires a Rust toolchain:
 
 ```sh
 # CLI
@@ -90,6 +90,9 @@ cargo run --release -p vibetrail-app
 
 Search is built in (the ripgrep engine crates are linked directly) — no
 external `rg` binary required.
+
+To produce a distributable app bundle locally: `cargo tauri build`
+(unsigned unless your shell has Developer ID signing env vars set).
 
 ## CLI
 
