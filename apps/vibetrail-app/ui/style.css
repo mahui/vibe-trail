@@ -40,8 +40,13 @@ body {
 #app {
   display: grid;
   grid-template-columns: 260px 340px 1fr;
+  /* minmax(0, …) pins the row to the viewport; an auto row would grow with
+     pane content and push scrolling onto the (hidden-overflow) body. */
+  grid-template-rows: minmax(0, 1fr);
   height: 100vh;
 }
+
+#app > * { min-height: 0; }
 
 #sidebar { background: var(--bg-alt); border-right: 1px solid var(--border); display: flex; flex-direction: column; }
 #middle  { border-right: 1px solid var(--border); display: flex; flex-direction: column; }
@@ -57,7 +62,9 @@ body {
   gap: 8px;
 }
 
-.scroll { flex: 1; overflow-y: auto; list-style: none; }
+/* min-height: 0 lets the flex item shrink below its content height —
+   without it overflow-y never engages and the pane cannot scroll. */
+.scroll { flex: 1; min-height: 0; overflow-y: auto; list-style: none; }
 .hidden { display: none !important; }
 .placeholder { color: var(--text-dim); font-weight: 400; }
 
