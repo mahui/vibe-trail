@@ -2,21 +2,28 @@
   <img src="assets/logo.png" alt="VibeTrail" width="128" height="128" />
 </p>
 
-# VibeTrail
+<h1 align="center">VibeTrail</h1>
 
-**Session browser & resume for coding agents (Claude Code, Codex, Antigravity, …)**
+<p align="center"><b>Session browser &amp; resume for coding agents — Claude Code, Codex, Antigravity, and yours next.</b></p>
+
+<p align="center">
+  <a href="https://github.com/vibetrail/vibetrail/actions"><img src="https://img.shields.io/github/actions/workflow/status/vibetrail/vibetrail/ci.yml?branch=main" alt="CI" /></a>
+  <img src="https://img.shields.io/badge/license-Apache--2.0-blue" alt="License" />
+  <img src="https://img.shields.io/badge/platform-macOS%2014%2B-lightgrey" alt="Platform" />
+  <img src="https://img.shields.io/badge/built%20with-Rust%20%2B%20Tauri-orange" alt="Stack" />
+</p>
 
 Browse and search every coding-agent session you have ever run — across all
 projects and all agents — and jump back into any of them with one click.
+
+<p align="center">
+  <img src="assets/screenshot-timeline.png" alt="Session timeline with markdown rendering, subagents, and one-click resume" width="880" />
+</p>
 
 > **Unofficial.** VibeTrail is an independent open-source project. It is not
 > affiliated with, endorsed by, or sponsored by Anthropic, OpenAI, Google, or
 > any other agent vendor. It only reads the session files those tools already
 > store on your machine, strictly read-only.
-
-<p align="center">
-  <img src="assets/screenshot.png" alt="VibeTrail screenshot (demo data)" width="720" />
-</p>
 
 ## Why
 
@@ -52,6 +59,10 @@ closes the loop: **browse → search → resume**.
   Ghostty, or Warp, in the right directory, with the right agent command.
 - **Scriptable** — every query command takes `--json` with a stable,
   snapshot-tested schema.
+
+<p align="center">
+  <img src="assets/screenshot-artifacts.png" alt="Antigravity session with artifacts, agent badges, and resume chains" width="880" />
+</p>
 
 ## Status
 
@@ -100,9 +111,15 @@ precondition failed · `4` operation unsupported by provider.
 
 The GUI's Resume button can target Terminal.app (default), iTerm2, Ghostty, or
 Warp — pick one in the sidebar selector (stored in
-`~/.config/vibetrail/config.json`). Warp cannot be scripted to run a command,
-so VibeTrail opens the project there and puts the resume command on your
-clipboard.
+`~/.config/vibetrail/config.json`).
+
+- **Terminal.app / iTerm2** — fully automatic (AppleScript).
+- **Ghostty** — cold start is fully automatic; with Ghostty already running,
+  VibeTrail opens a new tab in the project directory through Ghostty's own
+  Finder service and puts the resume command on your clipboard (its scripting
+  API is still a preview — VibeTrail deliberately avoids driving it).
+- **Warp** — opens the project window; the resume command lands on your
+  clipboard (Warp has no scriptable command execution).
 
 ## Safety
 

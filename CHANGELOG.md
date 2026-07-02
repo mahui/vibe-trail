@@ -31,8 +31,11 @@ providers, from a Tauri app and a `vibetrail` CLI.
 - Full-text search built on the ripgrep engine crates (no external `rg`):
   parallel across providers and files, project scoping, 500-hit circuit
   breaker, per-message jump anchors; results stay open while browsing hits.
-- One-click resume into Terminal.app, iTerm2, Ghostty, or Warp (degraded:
-  opens at path + command on clipboard).
+- One-click resume into Terminal.app, iTerm2, Ghostty, or Warp. Ghostty is
+  driven through its Finder service (new tab in the project directory) rather
+  than its preview scripting API, which proved unstable under load.
+- Agent lettermark badges (CC / CX / AG) with full-name tooltips; copyable
+  session-id chips in lists and the detail header.
 - Everything scriptable: every query command takes `--json` with a
   snapshot-pinned schema.
 
