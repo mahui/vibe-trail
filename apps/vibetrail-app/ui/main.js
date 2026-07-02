@@ -375,10 +375,11 @@ async function runSearch() {
     exitSearchMode();
     return;
   }
-  const hits = await call("search", { query, project: state.selectedProject });
-  el.results.replaceChildren();
+  el.results.replaceChildren(text("li", "empty", "Searching…"));
   el.results.classList.remove("hidden");
   el.sessions.classList.add("hidden");
+  const hits = await call("search", { query, project: state.selectedProject });
+  el.results.replaceChildren();
   if (hits.length === 0) {
     el.results.append(text("li", "empty", `No matches for “${query}”.`));
     return;

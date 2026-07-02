@@ -59,6 +59,10 @@ pub struct GrepSearchEngine<'a> {
     /// Cap per file: a session that mentions the query hundreds of times
     /// still only needs a few hits to be findable.
     max_hits_per_file: usize,
+    /// Global circuit breaker: once this many hits resolved, remaining files
+    /// are skipped. High-frequency queries would otherwise scan everything
+    /// just to produce results nobody scrolls through.
+    max_total_hits: usize,
 }
 
 impl<'a> GrepSearchEngine<'a> {
@@ -66,12 +70,16 @@ impl<'a> GrepSearchEngine<'a> {
         Self {
             providers,
             max_hits_per_file: 50,
+            max_total_hits: 500,
         }
     }
 }
 
 impl SearchEngine for GrepSearchEngine<'_> {
     fn search(&self, query: &str, scope: &Scope) -> Result<Vec<SearchHit>> {
+        use rayon::prelude::*;
+        use std::sync::atomic::{AtomicUsize, Ordering};
+
         if query.is_empty() {
             return Err(Error::Usage("Empty search query".to_string()));
         }
@@ -80,58 +88,69 @@ impl SearchEngine for GrepSearchEngine<'_> {
             .fixed_strings(true)
             .build(query)
             .map_err(|e| Error::Data(format!("Bad search pattern: {e}")))?;
-        let mut hits = Vec::new();
-        for provider in self.providers {
-            if scope
-                .provider_id
-                .as_deref()
-                .is_some_and(|id| id != provider.id())
-            {
-                continue;
-            }
-            let files: Vec<PathBuf> = provider
-                .search_roots(scope.project_path.as_deref())
-                .iter()
-                .flat_map(|root| WalkDir::new(root).into_iter().filter_map(|e| e.ok()))
-                .filter(|entry| entry.file_type().is_file())
-                .map(|entry| entry.into_path())
-                .filter(|path| path.extension().is_some_and(|ext| ext == "jsonl"))
-                .collect();
-            // Multi-GB stores are normal; grep files in parallel (rg does the
-            // same). Still no index (ADR-2).
-            use rayon::prelude::*;
-            let cap = self.max_hits_per_file;
-            let file_hits: Vec<Vec<SearchHit>> = files
-                .par_iter()
-                .map(|path| {
-                    let mut matched_lines: Vec<(u64, String)> = Vec::new();
-                    // sinks::UTF8 requires line numbers to be enabled.
-                    let mut searcher = SearcherBuilder::new().line_number(true).build();
-                    let sink = UTF8(|line_number, line| {
-                        matched_lines.push((line_number, line.to_string()));
-                        Ok(matched_lines.len() < cap)
-                    });
-                    if searcher.search_path(&matcher, path, sink).is_err() {
-                        return Vec::new(); // unreadable file: skip, never abort search
-                    }
-                    matched_lines
-                        .iter()
-                        .filter_map(|(line_number, line)| {
-                            provider.resolve_hit(path, *line_number, line, query)
-                        })
-                        .collect()
-                })
-                .collect();
-            hits.extend(file_hits.into_iter().flatten());
-            // ADR-3 degrade path: compressed transcripts the engine cannot grep.
-            hits.extend(provider.search_compressed(query, scope.project_path.as_deref()));
-        }
-        // Providers whose storage cannot narrow by project (date-organized
-        // Codex) return all hits; enforce the scope generically here.
+        let total = AtomicUsize::new(0);
+        // Providers run in parallel too — wall time is max(provider) instead
+        // of sum(provider). Still no index (ADR-2).
+        let mut hits: Vec<SearchHit> = self
+            .providers
+            .par_iter()
+            .filter(|provider| {
+                scope
+                    .provider_id
+                    .as_deref()
+                    .is_none_or(|id| id == provider.id())
+            })
+            .flat_map(|provider| {
+                let files: Vec<PathBuf> = provider
+                    .search_roots(scope.project_path.as_deref())
+                    .iter()
+                    .flat_map(|root| WalkDir::new(root).into_iter().filter_map(|e| e.ok()))
+                    .filter(|entry| entry.file_type().is_file())
+                    .map(|entry| entry.into_path())
+                    .filter(|path| path.extension().is_some_and(|ext| ext == "jsonl"))
+                    .collect();
+                let cap = self.max_hits_per_file;
+                let mut provider_hits: Vec<SearchHit> = files
+                    .par_iter()
+                    .map(|path| {
+                        if total.load(Ordering::Relaxed) >= self.max_total_hits {
+                            return Vec::new(); // breaker tripped: skip file
+                        }
+                        let mut matched_lines: Vec<(u64, String)> = Vec::new();
+                        // sinks::UTF8 requires line numbers to be enabled.
+                        let mut searcher = SearcherBuilder::new().line_number(true).build();
+                        let sink = UTF8(|line_number, line| {
+                            matched_lines.push((line_number, line.to_string()));
+                            Ok(matched_lines.len() < cap)
+                        });
+                        if searcher.search_path(&matcher, path, sink).is_err() {
+                            return Vec::new(); // unreadable file: skip, never abort
+                        }
+                        let resolved: Vec<SearchHit> = matched_lines
+                            .iter()
+                            .filter_map(|(line_number, line)| {
+                                provider.resolve_hit(path, *line_number, line, query)
+                            })
+                            .collect();
+                        total.fetch_add(resolved.len(), Ordering::Relaxed);
+                        resolved
+                    })
+                    .flatten()
+                    .collect();
+                // ADR-3 degrade path: compressed transcripts the engine
+                // cannot grep.
+                provider_hits
+                    .extend(provider.search_compressed(query, scope.project_path.as_deref()));
+                provider_hits
+            })
+            .collect();
+        // Providers whose storage cannot narrow by project return all hits;
+        // enforce the scope generically here.
         if let Some(project) = scope.project_path.as_deref() {
             let normalized = crate::store::normalize_path(project);
             hits.retain(|hit| hit.project_path == normalized);
         }
+        hits.truncate(self.max_total_hits);
         Ok(hits)
     }
 }

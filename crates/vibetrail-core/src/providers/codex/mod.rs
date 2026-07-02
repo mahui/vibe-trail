@@ -330,10 +330,21 @@ impl Provider for CodexProvider {
         None
     }
 
-    fn search_roots(&self, _project_path: Option<&str>) -> Vec<PathBuf> {
-        // Date-organized storage cannot narrow by project; the engine filters
-        // resolved hits against the scope instead.
-        vec![self.root.clone()]
+    fn search_roots(&self, project_path: Option<&str>) -> Vec<PathBuf> {
+        let Some(project_path) = project_path else {
+            return vec![self.root.clone()];
+        };
+        // Date-organized storage cannot narrow by directory, but discovery
+        // (parallel first-line reads, ~0.5s for 19k files) is far cheaper
+        // than grepping the whole multi-GB store: return the project's file
+        // list instead of the root. WalkDir yields plain files as themselves.
+        let normalized = normalize_path(project_path);
+        self.discover()
+            .unwrap_or_default()
+            .into_iter()
+            .filter(|raw| raw.project_path == normalized)
+            .map(|raw| raw.file_path)
+            .collect()
     }
 
     fn resolve_hit(
@@ -348,12 +359,20 @@ impl Provider for CodexProvider {
 
     /// ADR-3 degrade path: .jsonl.zst transcripts are decompressed and
     /// scanned inside the provider.
-    fn search_compressed(&self, query: &str, _project_path: Option<&str>) -> Vec<SearchHit> {
+    fn search_compressed(&self, query: &str, project_path: Option<&str>) -> Vec<SearchHit> {
         let query_lower = query.to_lowercase();
+        let scope = project_path.map(normalize_path);
         let mut hits = Vec::new();
         for file in self.rollout_files() {
             if !is_zst(&file) {
                 continue;
+            }
+            if let Some(scope) = &scope {
+                // Scoped search: only this project's transcripts.
+                let (cwd, _) = self.extract_meta(&file);
+                if normalize_path(cwd.as_deref().unwrap_or("/")).as_str() != scope {
+                    continue;
+                }
             }
             let Ok(data) = self.read_all(&file) else {
                 continue;
