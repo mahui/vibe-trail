@@ -397,21 +397,21 @@ async function runSearch() {
     for (const hit of sessionHits.slice(0, 5)) {
       const li = text("li", "hit");
       li.append(text("div", "snippet", hit.snippet));
-      li.addEventListener("click", () => openHit(hit));
+      li.addEventListener("click", () => openHit(hit, li));
       el.results.append(li);
     }
   }
 }
 
-async function openHit(hit) {
-  // Jump: select the hit's project + session, then scroll to the message.
+async function openHit(hit, li) {
+  // Open the hit's session in the detail pane, anchored on the matched
+  // message — but keep the results list: browsing through several hits is
+  // the whole point of a search. Escape / clearing the query exits.
+  el.results.querySelectorAll(".selected").forEach((n) => n.classList.remove("selected"));
+  if (li) li.classList.add("selected");
   state.scrollTarget = hit.messageUuid || null;
-  const projectLi = [...el.projects.children].find((li) => li.dataset.path === hit.projectPath);
-  await selectProject(hit.projectPath, projectLi);
-  el.search.value = "";
-  exitSearchMode();
-  const sessionLi = [...el.sessions.children].find((li) => li.dataset.id === hit.sessionId);
-  await selectSession(hit.sessionId, sessionLi);
+  state.selectedSession = hit.sessionId;
+  await loadDetail(hit.sessionId);
 }
 
 // ---- boot --------------------------------------------------------------------
