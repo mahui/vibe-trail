@@ -27,6 +27,11 @@ pub struct RawSession {
     pub project_path: String,
     pub mtime: DateTime<Utc>,
     pub file_size: u64,
+    /// Native id of the session this one continues (resume-fork copies in
+    /// Claude Code, forked_from_id / subagent thread spawns in Codex).
+    /// Extracted from bytes discovery already reads — no extra I/O.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub parent_native_id: Option<String>,
 }
 
 impl RawSession {

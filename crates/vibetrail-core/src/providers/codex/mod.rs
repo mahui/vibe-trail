@@ -77,14 +77,23 @@ impl CodexProvider {
     }
 
     fn extract_meta(&self, path: &Path) -> (Option<String>, Option<String>) {
+        let (cwd, branch, _) = self.extract_meta_full(path);
+        (cwd, branch)
+    }
+
+    /// session_meta carries the chain links too: `forked_from_id` for
+    /// fork/resume, and `source.subagent.thread_spawn.parent_thread_id` for
+    /// multi-agent worker threads (which are otherwise indistinguishable
+    /// from top-level sessions).
+    fn extract_meta_full(&self, path: &Path) -> (Option<String>, Option<String>, Option<String>) {
         let Some(line) = self.read_first_line(path) else {
-            return (None, None);
+            return (None, None, None);
         };
         let Ok(entry) = serde_json::from_slice::<RolloutLine>(&line) else {
-            return (None, None);
+            return (None, None, None);
         };
         if entry.entry_type.as_deref() != Some("session_meta") {
-            return (None, None);
+            return (None, None, None);
         }
         let payload = entry.payload.unwrap_or(Value::Null);
         let cwd = payload
@@ -95,7 +104,16 @@ impl CodexProvider {
             .pointer("/git/branch")
             .and_then(Value::as_str)
             .map(str::to_string);
-        (cwd, branch)
+        let parent = payload
+            .get("forked_from_id")
+            .and_then(Value::as_str)
+            .or_else(|| {
+                payload
+                    .pointer("/source/subagent/thread_spawn/parent_thread_id")
+                    .and_then(Value::as_str)
+            })
+            .map(str::to_string);
+        (cwd, branch, parent)
     }
 
     fn make_summary(&self, raw: &RawSession, result: &CodexParseResult) -> SessionSummary {
@@ -165,7 +183,7 @@ impl CodexProvider {
     fn raw_session_for(&self, file: PathBuf) -> Option<RawSession> {
         let native_id = native_id_of(&file)?;
         let metadata = fs::metadata(&file).ok()?;
-        let (cwd, _) = self.extract_meta(&file);
+        let (cwd, _, parent_native_id) = self.extract_meta_full(&file);
         // No usable fallback: without session_meta cwd the session cannot be
         // grouped, so it lands under "/" rather than being dropped.
         let project_path = normalize_path(cwd.as_deref().unwrap_or("/"));
@@ -179,6 +197,7 @@ impl CodexProvider {
                 .unwrap_or(DateTime::<Utc>::UNIX_EPOCH),
             file_size: metadata.len(),
             file_path: file,
+            parent_native_id,
         })
     }
 

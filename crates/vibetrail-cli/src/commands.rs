@@ -48,7 +48,9 @@ pub fn sessions(
     json: bool,
 ) -> Result<()> {
     let project_path = store.resolve_project(project)?;
-    let sessions = store.sessions(&project_path, provider, Some(limit))?;
+    let mut handles = store.session_handles(&project_path, provider)?;
+    handles.truncate(limit);
+    let sessions = store.summarize_handles(&handles);
     if json {
         println!("{}", to_json(&sessions)?);
         return Ok(());
@@ -57,8 +59,24 @@ pub fn sessions(
         println!("No sessions in {}.", format::abbreviate_path(&project_path));
         return Ok(());
     }
+    // Resume/fork chain markers: ↳ when the parent is in this project.
+    let known: std::collections::HashSet<&str> =
+        handles.iter().map(|h| h.native_id.as_str()).collect();
+    let parent_of: std::collections::HashMap<&str, &str> = handles
+        .iter()
+        .filter_map(|h| {
+            let parent = h.parent_native_id.as_deref()?;
+            known
+                .contains(parent)
+                .then_some((h.native_id.as_str(), parent))
+        })
+        .collect();
     for session in sessions {
         let short_id: String = session.native_id.chars().take(8).collect();
+        let chain = match parent_of.get(session.native_id.as_str()) {
+            Some(parent) => format!("↳ {} ", &parent[..8.min(parent.len())]),
+            None => String::new(),
+        };
         let mut line = format!(
             "{short_id}  {} {} {} ",
             format::pad(&format::relative_time(&session.mtime), 12),
@@ -68,6 +86,7 @@ pub fn sessions(
         if let Some(branch) = &session.git_branch {
             line.push_str(&format!("{} ", format::pad(branch, 14)));
         }
+        line.push_str(&chain);
         line.push_str(&format::truncate(&session.title, 70));
         println!("{line}");
     }

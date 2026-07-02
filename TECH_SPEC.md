@@ -132,6 +132,7 @@ entry 解析 → 分类过滤 → 消息重组 → 树重建 → 展示转换
 4. **parent-child UUID 构成树。** subagent 分散独立文件,多阶段重建 + 固定 merge 顺序(主会话 → 逐个 subagent),禁止单趟合并。
 
 **Resume:** `claude --resume <session-id>`(先 cd 到项目路径)。
+**链信号:** resume-fork 会把父会话历史复制进新文件,被复制行保留原 sessionId——文件头部第一个 ≠ 自身 id 的 sessionId 即链父(发现时从已读的头部字节提取,零额外 IO)。
 
 ### 4.2 Codex(v1.1)
 
@@ -142,7 +143,8 @@ entry 解析 → 分类过滤 → 消息重组 → 树重建 → 展示转换
 - 未知 type/payload(如 `ghost_snapshot`)忽略 + 计数。
 
 会话线性,无流式分行、无重复 UUID、无 parent-child 树(CC 四规则不适用,留在 CC provider 内)。消息无内在 id,以 `L<1-based 行号>` 为 uuid,搜索命中据此锚定跳转。
-**Resume:** `codex resume <session-id>`(先 cd 到项目路径)。
+**Resume:** `codex resume <session-id>`(先 cd 到项目路径;常规 resume 追加原文件,不产生新会话)。
+**链信号:** session_meta 的 `forked_from_id`(fork)与 `source.subagent.thread_spawn.parent_thread_id`(multi-agent worker 线程,否则与顶层会话无法区分)即链父,随首行一并提取。
 **规模注意:** 数万 rollout 文件属正常(本机 1.9 万+),discover 的首行读取必须并行。
 
 ### 4.3 Antigravity(v1.2,experimental)

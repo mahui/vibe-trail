@@ -37,7 +37,7 @@ fn raw(native_id: &str) -> RawSession {
 fn discovers_top_level_sessions_only() {
     let sessions = provider().discover().unwrap();
     // Subagent files under <session>/subagents/ must not surface as sessions.
-    assert_eq!(sessions.len(), 2);
+    assert_eq!(sessions.len(), 3);
     assert!(sessions
         .iter()
         .all(|s| s.project_path == "/Users/tester/demo-app"));
@@ -189,8 +189,22 @@ fn projects_aggregation() {
     let project = &projects[0];
     assert_eq!(project.real_path, "/Users/tester/demo-app");
     assert!(!project.exists);
-    assert_eq!(project.session_count, 2);
+    assert_eq!(project.session_count, 3);
     assert!(project.providers.contains("claude-code"));
+}
+
+// Resume-fork files start with history copied from the parent; those lines
+// keep the parent's sessionId, which names the chain parent.
+#[test]
+fn resume_chain_parent_extracted() {
+    let sessions = provider().discover().unwrap();
+    let resumed = sessions
+        .iter()
+        .find(|s| s.native_id == "33333333-3333-3333-3333-333333333333")
+        .unwrap();
+    assert_eq!(resumed.parent_native_id.as_deref(), Some(SESSION_1));
+    let root = sessions.iter().find(|s| s.native_id == SESSION_1).unwrap();
+    assert_eq!(root.parent_native_id, None);
 }
 
 #[test]

@@ -1,0 +1,2 @@
+{"timestamp":"2026-06-12T10:05:00.000Z","type":"session_meta","payload":{"id":"eeeeeeee-1111-2222-3333-444444444444","timestamp":"2026-06-12T10:05:00.000Z","cwd":"/Users/tester/demo-app","source":{"subagent":{"thread_spawn":{"parent_thread_id":"aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee","depth":1,"agent_nickname":"Worker"}}}}}
+{"timestamp":"2026-06-12T10:05:05.000Z","type":"response_item","payload":{"type":"message","role":"assistant","content":[{"type":"output_text","text":"Worker thread output"}]}}

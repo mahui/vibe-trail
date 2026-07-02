@@ -1,0 +1,2 @@
+{"timestamp":"2026-06-12T10:00:00.000Z","type":"session_meta","payload":{"id":"dddddddd-1111-2222-3333-444444444444","timestamp":"2026-06-12T10:00:00.000Z","cwd":"/Users/tester/demo-app","source":"cli","forked_from_id":"aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee","git":{"branch":"main"}}}
+{"timestamp":"2026-06-12T10:00:05.000Z","type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"Keep going on the retry work"}]}}

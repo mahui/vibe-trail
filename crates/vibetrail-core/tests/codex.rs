@@ -32,9 +32,33 @@ fn raw() -> RawSession {
 #[test]
 fn discovers_rollout_files_with_meta_cwd() {
     let sessions = provider().discover().unwrap();
-    assert_eq!(sessions.len(), 1);
-    assert_eq!(sessions[0].native_id, SESSION_ID);
-    assert_eq!(sessions[0].project_path, "/Users/tester/demo-app");
+    assert_eq!(sessions.len(), 3);
+    assert!(sessions.iter().any(|s| s.native_id == SESSION_ID));
+    assert!(sessions
+        .iter()
+        .all(|s| s.project_path == "/Users/tester/demo-app"));
+}
+
+// forked_from_id and subagent thread_spawn.parent_thread_id both name the
+// chain parent.
+#[test]
+fn chain_parents_extracted() {
+    let sessions = provider().discover().unwrap();
+    let by_id = |id: &str| {
+        sessions
+            .iter()
+            .find(|s| s.native_id.starts_with(id))
+            .unwrap()
+    };
+    assert_eq!(
+        by_id("dddddddd").parent_native_id.as_deref(),
+        Some(SESSION_ID)
+    );
+    assert_eq!(
+        by_id("eeeeeeee").parent_native_id.as_deref(),
+        Some(SESSION_ID)
+    );
+    assert_eq!(by_id("aaaaaaaa").parent_native_id, None);
 }
 
 #[test]
@@ -178,19 +202,19 @@ fn cross_provider_project_aggregation() {
     // Both fixtures use cwd /Users/tester/demo-app → a single merged project.
     assert_eq!(projects.len(), 1);
     let project = &projects[0];
-    assert_eq!(project.session_count, 3);
+    assert_eq!(project.session_count, 6);
     assert!(project.providers.contains("claude-code"));
     assert!(project.providers.contains("codex"));
 
     let sessions = store
         .sessions("/Users/tester/demo-app", None, None)
         .unwrap();
-    assert_eq!(sessions.len(), 3);
+    assert_eq!(sessions.len(), 6);
 
     // Provider-scoped listing still works.
     let codex_only = store
         .sessions("/Users/tester/demo-app", Some("codex"), None)
         .unwrap();
-    assert_eq!(codex_only.len(), 1);
+    assert_eq!(codex_only.len(), 3);
     assert_eq!(codex_only[0].provider_id, "codex");
 }

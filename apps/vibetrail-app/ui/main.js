@@ -132,15 +132,111 @@ const sessionState = {
   sentinel: null,
   observer: null,
   loading: false,
+  // Resume/fork chains: depth + root per session, descendants per root.
+  depth: new Map(),
+  rootOf: new Map(),
+  chainSize: new Map(),
+  expandedRoots: new Set(),
 };
+
+// Group resume/fork chains: a session whose parentNativeId is present in the
+// project follows its root, indented; roots sort by the newest mtime in
+// their chain. Chains collapse under the root by default.
+function orderByChains(handles) {
+  sessionState.depth = new Map();
+  sessionState.rootOf = new Map();
+  sessionState.chainSize = new Map();
+  sessionState.expandedRoots = new Set();
+  const byId = new Map(handles.map((h) => [h.nativeId, h]));
+  const children = new Map();
+  const roots = [];
+  for (const handle of handles) {
+    const pid = handle.parentNativeId;
+    if (pid && pid !== handle.nativeId && byId.has(pid)) {
+      if (!children.has(pid)) children.set(pid, []);
+      children.get(pid).push(handle);
+    } else {
+      roots.push(handle);
+    }
+  }
+  const newest = new Map();
+  const chainNewest = (handle) => {
+    if (newest.has(handle.nativeId)) return newest.get(handle.nativeId);
+    let m = handle.mtime;
+    for (const child of children.get(handle.nativeId) || []) {
+      const cm = chainNewest(child);
+      if (cm > m) m = cm;
+    }
+    newest.set(handle.nativeId, m);
+    return m;
+  };
+  roots.sort((a, b) => (chainNewest(a) < chainNewest(b) ? 1 : -1));
+  const ordered = [];
+  const walk = (handle, depth, root) => {
+    ordered.push(handle);
+    sessionState.depth.set(handle.nativeId, depth);
+    sessionState.rootOf.set(handle.nativeId, root);
+    if (depth > 0) {
+      sessionState.chainSize.set(root, (sessionState.chainSize.get(root) || 0) + 1);
+    }
+    const kids = (children.get(handle.nativeId) || [])
+      .sort((a, b) => (a.mtime < b.mtime ? -1 : 1)); // segments chronologically
+    for (const kid of kids) walk(kid, depth + 1, root);
+  };
+  for (const root of roots) walk(root, 0, root.nativeId);
+  // Cyclic parent references (corrupt or adversarial data) would otherwise
+  // swallow every involved session: demote unreached ones to roots.
+  if (ordered.length < handles.length) {
+    for (const handle of handles) {
+      if (!sessionState.depth.has(handle.nativeId)) {
+        ordered.push(handle);
+        sessionState.depth.set(handle.nativeId, 0);
+        sessionState.rootOf.set(handle.nativeId, handle.nativeId);
+      }
+    }
+  }
+  return ordered;
+}
+
+function toggleChain(rootId, badge) {
+  const expanded = sessionState.expandedRoots.has(rootId);
+  if (expanded) sessionState.expandedRoots.delete(rootId);
+  else sessionState.expandedRoots.add(rootId);
+  el.sessions
+    .querySelectorAll(`li[data-chain-root="${CSS.escape(rootId)}"]`)
+    .forEach((row) => row.classList.toggle("hidden", expanded));
+  badge.textContent = chainBadgeLabel(rootId);
+}
+
+function chainBadgeLabel(rootId) {
+  const count = sessionState.chainSize.get(rootId) || 0;
+  const open = sessionState.expandedRoots.has(rootId);
+  return `${open ? "▾" : "▸"} ⑂ ${count}`;
+}
 
 function sessionRow(session) {
   const li = document.createElement("li");
   li.dataset.id = session.id;
-  li.append(text("div", "title", session.title));
+  const depth = sessionState.depth.get(session.nativeId) || 0;
+  const rootId = sessionState.rootOf.get(session.nativeId);
+  if (depth > 0) {
+    li.classList.add("chain-child");
+    li.dataset.chainRoot = rootId;
+    if (!sessionState.expandedRoots.has(rootId)) li.classList.add("hidden");
+  }
+  li.append(text("div", "title", (depth > 0 ? "↳ " : "") + session.title));
   const branch = session.gitBranch ? ` · ${session.gitBranch}` : "";
   const meta = text("div", "meta");
   meta.append(idChip(session.nativeId));
+  if (depth === 0 && (sessionState.chainSize.get(session.nativeId) || 0) > 0) {
+    const badge = text("span", "chain-badge", chainBadgeLabel(session.nativeId));
+    badge.title = "Resume/fork continuations — click to expand";
+    badge.addEventListener("click", (event) => {
+      event.stopPropagation();
+      toggleChain(session.nativeId, badge);
+    });
+    meta.append(badge);
+  }
   meta.append(text("span", "",
     ` ${providerLabel(session.providerId)} · ${relativeTime(session.mtime)} · ${session.messageCount} msg${branch}`));
   li.append(meta);
@@ -153,7 +249,7 @@ async function loadSessions(path) {
   el.sessions.replaceChildren();
   const handles = await call("list_session_handles", { project: path });
   if (generation !== sessionState.generation) return; // superseded click
-  sessionState.handles = handles;
+  sessionState.handles = orderByChains(handles);
   sessionState.loaded = 0;
   sessionState.loading = false;
   if (sessionState.observer) sessionState.observer.disconnect();

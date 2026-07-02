@@ -287,3 +287,17 @@ details.thinking summary { color: var(--thinking); }
 }
 .id-chip:hover { border-color: var(--accent); color: var(--accent); }
 .id-chip::after { content: " ⧉"; opacity: 0.55; }
+
+/* Resume/fork chains in the session list */
+#session-list li.chain-child { padding-left: 26px; background: color-mix(in srgb, var(--bg-alt) 55%, transparent); }
+.chain-badge {
+  font: 11px ui-monospace, "SF Mono", Menlo, monospace;
+  color: var(--accent);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0 5px;
+  margin-left: 4px;
+  cursor: pointer;
+  user-select: none;
+}
+.chain-badge:hover { border-color: var(--accent); }

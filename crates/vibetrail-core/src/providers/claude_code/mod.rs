@@ -42,18 +42,48 @@ impl ClaudeCodeProvider {
     /// Metadata-level cwd extraction: scan only the head of the file for the
     /// first entry carrying a `cwd` field (discovery must not full-parse).
     fn extract_cwd(&self, file: &Path) -> Option<String> {
-        let head = read_head(file, BOUNDED_READ)?;
+        self.extract_head_meta(file, None).0
+    }
+
+    /// One bounded head read yields both the cwd and the resume-chain parent:
+    /// a resume-fork copies the parent's history into the new file, and those
+    /// copied lines keep their original sessionId — the first sessionId that
+    /// differs from the file's own id names the parent.
+    fn extract_head_meta(
+        &self,
+        file: &Path,
+        own_id: Option<&str>,
+    ) -> (Option<String>, Option<String>) {
+        let Some(head) = read_head(file, BOUNDED_READ) else {
+            return (None, None);
+        };
+        let mut cwd = None;
+        let mut parent = None;
         for line in head.split(|&b| b == b'\n').take(40) {
             let Ok(value) = serde_json::from_slice::<Value>(line) else {
                 continue;
             };
-            if let Some(cwd) = value.get("cwd").and_then(Value::as_str) {
-                if !cwd.is_empty() {
-                    return Some(cwd.to_string());
+            if cwd.is_none() {
+                if let Some(found) = value.get("cwd").and_then(Value::as_str) {
+                    if !found.is_empty() {
+                        cwd = Some(found.to_string());
+                    }
                 }
             }
+            if parent.is_none() {
+                if let (Some(own_id), Some(sid)) =
+                    (own_id, value.get("sessionId").and_then(Value::as_str))
+                {
+                    if !sid.is_empty() && sid != own_id {
+                        parent = Some(sid.to_string());
+                    }
+                }
+            }
+            if cwd.is_some() && (own_id.is_none() || parent.is_some()) {
+                break;
+            }
         }
-        None
+        (cwd, parent)
     }
 
     /// Lossy fallback only ("-Users-x-my-app" cannot distinguish "/" from
@@ -226,8 +256,13 @@ impl Provider for ClaudeCodeProvider {
             for file in jsonl_files {
                 let metadata = fs::metadata(&file)
                     .map_err(|e| Error::Data(format!("stat {}: {e}", file.display())))?;
-                let cwd = self
-                    .extract_cwd(&file)
+                let native_id = file
+                    .file_stem()
+                    .unwrap_or_default()
+                    .to_string_lossy()
+                    .to_string();
+                let (found_cwd, parent_native_id) = self.extract_head_meta(&file, Some(&native_id));
+                let cwd = found_cwd
                     .or_else(|| dir_fallback_cwd.clone())
                     .unwrap_or_else(|| {
                         self.decode_project_dir_name(&dir_entry.file_name().to_string_lossy())
@@ -235,11 +270,7 @@ impl Provider for ClaudeCodeProvider {
                 dir_fallback_cwd.get_or_insert_with(|| cwd.clone());
                 sessions.push(RawSession {
                     provider_id: PROVIDER_ID.to_string(),
-                    native_id: file
-                        .file_stem()
-                        .unwrap_or_default()
-                        .to_string_lossy()
-                        .to_string(),
+                    native_id,
                     project_path: normalize_path(&cwd),
                     mtime: metadata
                         .modified()
@@ -247,6 +278,7 @@ impl Provider for ClaudeCodeProvider {
                         .unwrap_or(DateTime::<Utc>::UNIX_EPOCH),
                     file_size: metadata.len(),
                     file_path: file,
+                    parent_native_id,
                 });
             }
         }
