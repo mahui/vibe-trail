@@ -50,8 +50,10 @@ pub trait Provider: Send + Sync {
     fn parse(&self, raw: &RawSession) -> Result<Session>;
     fn outline(&self, raw: &RawSession) -> Result<Vec<MessageStub>>;
     fn page(&self, raw: &RawSession, offset: usize, limit: usize) -> Result<Vec<Message>>;
-    /// None when this provider (or this session) cannot be resumed.
-    fn resume_spec(&self, summary: &SessionSummary) -> Option<ResumeSpec>;
+    /// None when this provider (or this session) cannot be resumed. Takes the
+    /// discovery handle: resume needs only metadata and must never trigger a
+    /// full transcript parse.
+    fn resume_spec(&self, raw: &RawSession) -> Option<ResumeSpec>;
 
     /// Summary without keeping the full message array around. Providers may
     /// override with a cheaper streaming implementation.
@@ -63,6 +65,18 @@ pub trait Provider: Send + Sync {
     /// metadata-level (bounded reads); the default falls back to a full parse.
     fn quick_title(&self, raw: &RawSession) -> Option<String> {
         self.summarize(raw).ok().map(|summary| summary.title)
+    }
+
+    /// Locate sessions whose native id equals or starts with `reference`.
+    /// The default scans the full discovery; providers whose ids are encoded
+    /// in file names (Codex) override with a listing-only lookup so that
+    /// resolving one session does not pay a whole-store metadata read.
+    fn find(&self, reference: &str) -> Result<Vec<RawSession>> {
+        Ok(self
+            .discover()?
+            .into_iter()
+            .filter(|raw| raw.native_id == reference || raw.native_id.starts_with(reference))
+            .collect())
     }
 
     /// Directories the search engine may grep, scoped to one project when

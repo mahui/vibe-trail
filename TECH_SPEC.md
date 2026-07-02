@@ -78,8 +78,9 @@ pub trait Provider: Send + Sync {
     fn parse(&self, raw: &RawSession) -> Result<Session>;    // 归一化到统一模型
     fn outline(&self, raw: &RawSession) -> Result<Vec<MessageStub>>; // 懒加载
     fn page(&self, raw: &RawSession, offset: usize, limit: usize) -> Result<Vec<Message>>;
-    fn resume_spec(&self, s: &SessionSummary) -> Option<ResumeSpec>; // None = 不可 resume
+    fn resume_spec(&self, raw: &RawSession) -> Option<ResumeSpec>; // None = 不可 resume;只依赖元数据,禁止全量 parse
     fn quick_title(&self, raw: &RawSession) -> Option<String>; // 元数据级标题提取(项目总览用);默认实现回退全量 parse
+    fn find(&self, reference: &str) -> Result<Vec<RawSession>>; // 按 native id/前缀定位;默认 discover+filter,id 在文件名里的 provider(Codex)覆写为纯目录走查
     fn summarize(&self, raw: &RawSession) -> Result<SessionSummary>; // 默认实现 = parse().summary
     // 搜索适配(可 grep 的 provider 覆写;默认空 → 该 provider 不参与全文搜索)
     fn search_roots(&self, project_path: Option<&str>) -> Vec<PathBuf>;

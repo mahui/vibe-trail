@@ -177,17 +177,21 @@ impl SessionStore {
     }
 
     /// Resolve a session by composite id ("provider:native-id"), full native
-    /// id, or unique native-id prefix.
+    /// id, or unique native-id prefix. A composite id short-circuits to its
+    /// provider, and lookup goes through `Provider::find` — both keep session
+    /// opens from paying a whole-store discovery.
     pub fn resolve_session(&self, reference: &str) -> Result<(&dyn Provider, RawSession)> {
-        let matches: Vec<RawSession> = self
-            .discover_all(None)?
-            .into_iter()
-            .filter(|raw| {
-                raw.composite_id() == reference
-                    || raw.native_id == reference
-                    || raw.native_id.starts_with(reference)
-            })
-            .collect();
+        let (provider_hint, native_reference) = match reference.split_once(':') {
+            Some((prefix, rest)) if self.provider(prefix).is_some() => (Some(prefix), rest),
+            _ => (None, reference),
+        };
+        let mut matches: Vec<RawSession> = Vec::new();
+        for provider in &self.providers {
+            if provider_hint.is_some_and(|id| id != provider.id()) {
+                continue;
+            }
+            matches.extend(provider.find(native_reference)?);
+        }
         match matches.len() {
             1 => {
                 let raw = matches.into_iter().next().unwrap();
@@ -219,9 +223,8 @@ impl SessionStore {
                 provider.id()
             )));
         }
-        let summary = provider.summarize(&raw)?;
-        let spec = provider.resume_spec(&summary).ok_or_else(|| {
-            Error::Unsupported(format!("Session {} cannot be resumed", summary.id))
+        let spec = provider.resume_spec(&raw).ok_or_else(|| {
+            Error::Unsupported(format!("Session {} cannot be resumed", raw.composite_id()))
         })?;
         if !Path::new(&spec.project_path).is_dir() {
             return Err(Error::ResumePrecondition(format!(

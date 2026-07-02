@@ -220,3 +220,11 @@ details.thinking summary { color: var(--thinking); }
   font: 11px/1.6 ui-monospace, "SF Mono", Menlo, monospace;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
+
+#session-list li.notice {
+  font-size: 11px;
+  color: var(--text-dim);
+  padding: 5px 12px;
+  background: var(--bg-alt);
+}
+.timeline-sentinel { text-align: center; color: var(--text-dim); padding: 8px; }

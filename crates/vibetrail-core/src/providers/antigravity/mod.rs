@@ -355,7 +355,7 @@ impl Provider for AntigravityProvider {
 
     /// Not resumable: Antigravity has no CLI resume entry point (ADR-6 keeps
     /// the LanguageServer path out of scope).
-    fn resume_spec(&self, _summary: &SessionSummary) -> Option<ResumeSpec> {
+    fn resume_spec(&self, _raw: &RawSession) -> Option<ResumeSpec> {
         None
     }
 

@@ -25,10 +25,14 @@ fn list_projects() -> Result<Vec<Project>, String> {
     store().projects().map_err(|e| e.to_string())
 }
 
+/// F2 with a hard cap: a 700-session project must not full-parse everything
+/// on one click. The frontend shows a "latest N" notice when it hits the cap.
+const SESSION_LIST_CAP: usize = 100;
+
 #[tauri::command]
 fn list_sessions(project: String) -> Result<Vec<SessionSummary>, String> {
     store()
-        .sessions(&project, None, None)
+        .sessions(&project, None, Some(SESSION_LIST_CAP))
         .map_err(|e| e.to_string())
 }
 
@@ -50,9 +54,14 @@ fn search(query: String, project: Option<String>) -> Result<Vec<SearchHit>, Stri
     search_store(&store(), &query, &scope).map_err(|e| e.to_string())
 }
 
+/// Capability + path existence only — the detail view already holds the
+/// parsed session, so this must not re-discover or re-parse anything.
 #[tauri::command]
-fn can_resume(session_id: String) -> bool {
-    store().resume_spec_for(&session_id).is_ok()
+fn can_resume(provider_id: String, project_path: String) -> bool {
+    store()
+        .provider(&provider_id)
+        .is_some_and(|p| p.capabilities().resumable)
+        && std::path::Path::new(&project_path).is_dir()
 }
 
 #[tauri::command]

@@ -162,6 +162,26 @@ impl CodexProvider {
         }
     }
 
+    fn raw_session_for(&self, file: PathBuf) -> Option<RawSession> {
+        let native_id = native_id_of(&file)?;
+        let metadata = fs::metadata(&file).ok()?;
+        let (cwd, _) = self.extract_meta(&file);
+        // No usable fallback: without session_meta cwd the session cannot be
+        // grouped, so it lands under "/" rather than being dropped.
+        let project_path = normalize_path(cwd.as_deref().unwrap_or("/"));
+        Some(RawSession {
+            provider_id: PROVIDER_ID.to_string(),
+            native_id,
+            project_path,
+            mtime: metadata
+                .modified()
+                .map(DateTime::<Utc>::from)
+                .unwrap_or(DateTime::<Utc>::UNIX_EPOCH),
+            file_size: metadata.len(),
+            file_path: file,
+        })
+    }
+
     fn hit_for_line(
         &self,
         file: &Path,
@@ -208,28 +228,23 @@ impl Provider for CodexProvider {
         let sessions = self
             .rollout_files()
             .into_par_iter()
-            .filter_map(|file| {
-                let native_id = native_id_of(&file)?;
-                let metadata = fs::metadata(&file).ok()?;
-                let (cwd, _) = self.extract_meta(&file);
-                // No usable fallback: without session_meta cwd the session
-                // cannot be grouped, so it lands under "/" rather than being
-                // dropped.
-                let project_path = normalize_path(cwd.as_deref().unwrap_or("/"));
-                Some(RawSession {
-                    provider_id: PROVIDER_ID.to_string(),
-                    native_id,
-                    project_path,
-                    mtime: metadata
-                        .modified()
-                        .map(DateTime::<Utc>::from)
-                        .unwrap_or(DateTime::<Utc>::UNIX_EPOCH),
-                    file_size: metadata.len(),
-                    file_path: file,
-                })
-            })
+            .filter_map(|file| self.raw_session_for(file))
             .collect();
         Ok(sessions)
+    }
+
+    /// Session ids live in the file names, so lookup needs only a directory
+    /// walk — the per-file session_meta read happens for matches alone.
+    /// Keeps opening one session from paying the whole-store metadata read.
+    fn find(&self, reference: &str) -> Result<Vec<RawSession>> {
+        Ok(self
+            .rollout_files()
+            .into_iter()
+            .filter(|file| {
+                native_id_of(file).is_some_and(|id| id == reference || id.starts_with(reference))
+            })
+            .filter_map(|file| self.raw_session_for(file))
+            .collect())
     }
 
     fn parse(&self, raw: &RawSession) -> Result<Session> {
@@ -265,13 +280,13 @@ impl Provider for CodexProvider {
         Ok(messages.into_iter().skip(offset).take(limit).collect())
     }
 
-    fn resume_spec(&self, summary: &SessionSummary) -> Option<ResumeSpec> {
+    fn resume_spec(&self, raw: &RawSession) -> Option<ResumeSpec> {
         Some(ResumeSpec {
-            project_path: summary.project_path.clone(),
+            project_path: raw.project_path.clone(),
             command: vec![
                 "codex".to_string(),
                 "resume".to_string(),
-                summary.native_id.clone(),
+                raw.native_id.clone(),
             ],
         })
     }

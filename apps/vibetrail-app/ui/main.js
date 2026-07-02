@@ -103,9 +103,14 @@ async function selectProject(path, li) {
 
 // ---- sessions (F2) ----------------------------------------------------------
 
+const SESSION_LIST_CAP = 100;
+
 async function loadSessions(path) {
   const sessions = await call("list_sessions", { project: path });
   el.sessions.replaceChildren();
+  if (sessions.length >= SESSION_LIST_CAP) {
+    el.sessions.append(text("li", "notice", `Showing the latest ${SESSION_LIST_CAP} sessions`));
+  }
   for (const session of sessions) {
     const li = document.createElement("li");
     li.dataset.id = session.id;
@@ -158,12 +163,12 @@ function blockNode(block) {
 async function loadDetail(sessionId) {
   const session = await call("get_session", { sessionId });
   const summary = session.summary;
-  el.title.classList.remove("placeholder");
   let sub = `${summary.projectPath} · ${summary.messageCount} messages`;
   const usage = session.extensions && session.extensions.usage;
   if (usage) {
     sub += ` · tokens ↑${compact(usage.inputTokens + usage.cacheCreationTokens + usage.cacheReadTokens)} ↓${compact(usage.outputTokens)}`;
   }
+  el.title.classList.remove("placeholder");
   el.title.replaceChildren(
     text("span", "", summary.title),
     document.createElement("br"),
@@ -200,22 +205,62 @@ async function loadDetail(sessionId) {
     }
     el.timeline.append(box);
   }
-  for (const message of session.messages) {
-    const row = text("div", `message ${message.role}`);
-    row.dataset.uuid = message.uuid;
-    row.append(text("div", "avatar", message.role === "user" ? "❯" : "●"));
-    const body = text("div", "body");
-    for (const block of message.blocks) body.append(blockNode(block));
-    row.append(body);
-    el.timeline.append(row);
-  }
-  const resumable = await call("can_resume", { sessionId });
+  startTimeline(session.messages);
+  // Capability + path check only; no re-discovery on the backend.
+  const resumable = await call("can_resume", {
+    providerId: summary.providerId,
+    projectPath: summary.projectPath,
+  });
   el.resume.classList.toggle("hidden", !resumable);
   el.resume.onclick = async () => {
     const note = await call("resume_session", { sessionId });
     if (note) toast(note, true);
   };
+}
+
+// ---- chunked timeline rendering (F3: never DOM-render a 5MB session at once)
+
+const RENDER_CHUNK = 200;
+const timelineState = { messages: [], rendered: 0, sentinel: null, observer: null };
+
+function messageNode(message) {
+  const row = text("div", `message ${message.role}`);
+  row.dataset.uuid = message.uuid;
+  row.append(text("div", "avatar", message.role === "user" ? "❯" : "●"));
+  const body = text("div", "body");
+  for (const block of message.blocks) body.append(blockNode(block));
+  row.append(body);
+  return row;
+}
+
+function renderNextChunk() {
+  const end = Math.min(timelineState.rendered + RENDER_CHUNK, timelineState.messages.length);
+  const fragment = document.createDocumentFragment();
+  for (; timelineState.rendered < end; timelineState.rendered++) {
+    fragment.append(messageNode(timelineState.messages[timelineState.rendered]));
+  }
+  el.timeline.insertBefore(fragment, timelineState.sentinel);
+  const done = timelineState.rendered >= timelineState.messages.length;
+  timelineState.sentinel.classList.toggle("hidden", done);
+  if (done && timelineState.observer) timelineState.observer.disconnect();
+}
+
+function startTimeline(messages) {
+  if (timelineState.observer) timelineState.observer.disconnect();
+  timelineState.messages = messages;
+  timelineState.rendered = 0;
+  const sentinel = text("div", "timeline-sentinel", "…");
+  timelineState.sentinel = sentinel;
+  el.timeline.append(sentinel);
+  timelineState.observer = new IntersectionObserver((entries) => {
+    if (entries.some((entry) => entry.isIntersecting)) renderNextChunk();
+  }, { root: el.timeline, rootMargin: "600px" });
+  timelineState.observer.observe(sentinel);
+  renderNextChunk();
   if (state.scrollTarget) {
+    // Render forward until the anchor exists, then jump to it.
+    const index = messages.findIndex((m) => m.uuid === state.scrollTarget);
+    while (index >= 0 && timelineState.rendered <= index) renderNextChunk();
     const target = el.timeline.querySelector(`[data-uuid="${CSS.escape(state.scrollTarget)}"]`);
     if (target) {
       target.scrollIntoView({ block: "start" });

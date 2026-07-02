@@ -104,8 +104,7 @@ fn quick_title_skips_context_payloads() {
 
 #[test]
 fn resume_command_matches_codex_cli() {
-    let summary = provider().parse(&raw()).unwrap().summary;
-    let spec = provider().resume_spec(&summary).unwrap();
+    let spec = provider().resume_spec(&raw()).unwrap();
     assert_eq!(spec.command, ["codex", "resume", SESSION_ID]);
     assert_eq!(spec.project_path, "/Users/tester/demo-app");
 }

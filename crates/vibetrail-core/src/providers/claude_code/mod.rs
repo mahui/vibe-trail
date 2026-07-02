@@ -302,13 +302,13 @@ impl Provider for ClaudeCodeProvider {
         Ok(messages.into_iter().skip(offset).take(limit).collect())
     }
 
-    fn resume_spec(&self, summary: &SessionSummary) -> Option<ResumeSpec> {
+    fn resume_spec(&self, raw: &RawSession) -> Option<ResumeSpec> {
         Some(ResumeSpec {
-            project_path: summary.project_path.clone(),
+            project_path: raw.project_path.clone(),
             command: vec![
                 "claude".to_string(),
                 "--resume".to_string(),
-                summary.native_id.clone(),
+                raw.native_id.clone(),
             ],
         })
     }

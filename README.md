@@ -46,8 +46,8 @@ closes the loop: **browse → search → resume**.
 cargo build --release -p vibetrail-cli
 target/release/vibetrail --help
 
-# GUI (Tauri v2; dev run)
-cargo run -p vibetrail-app
+# GUI (Tauri v2)
+cargo run --release -p vibetrail-app
 ```
 
 Search is built in (the ripgrep engine crates are linked directly) — no
