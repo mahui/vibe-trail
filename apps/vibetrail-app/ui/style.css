@@ -189,3 +189,16 @@ details.thinking summary { color: var(--thinking); }
   max-width: 70vw;
   z-index: 10;
 }
+
+/* Artifacts (Antigravity plan/task/walkthrough) */
+.artifacts {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin-bottom: 14px;
+  background: var(--bg-alt);
+}
+.artifacts-title { font-weight: 600; font-size: 12px; margin-bottom: 6px; color: var(--text-dim); }
+.artifact { display: flex; gap: 8px; font-size: 12px; padding: 2px 0; }
+.artifact-name { font-weight: 600; flex-shrink: 0; }
+.artifact-summary { color: var(--text-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

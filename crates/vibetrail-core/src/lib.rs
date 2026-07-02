@@ -17,6 +17,7 @@ pub(crate) mod textutil;
 pub use error::{Error, Result};
 pub use model::{ContentBlock, Message, MessageStub, Project, Role, Session, SessionSummary};
 pub use provider::{Provider, ProviderCapabilities, RawSession, ResumeSpec};
+pub use providers::antigravity::AntigravityProvider;
 pub use providers::claude_code::ClaudeCodeProvider;
 pub use providers::codex::CodexProvider;
 pub use resume::Resumer;

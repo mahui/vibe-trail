@@ -39,6 +39,10 @@ function relativeTime(iso) {
   return new Date(iso).toISOString().slice(0, 10);
 }
 
+function providerLabel(id) {
+  return id === "antigravity" ? "antigravity (exp)" : id;
+}
+
 function shortPath(path) {
   const parts = path.split("/");
   return parts[parts.length - 1] || path;
@@ -73,7 +77,7 @@ async function loadProjects() {
     if (!project.exists) name.append(text("span", "", "⚠"));
     li.append(name);
     li.append(text("div", "meta",
-      `${project.sessionCount} sessions · ${relativeTime(project.lastActive)} · ${[...project.providers].join(",")}`));
+      `${project.sessionCount} sessions · ${relativeTime(project.lastActive)} · ${[...project.providers].map(providerLabel).join(",")}`));
     if (project.lastPrompt) li.append(text("div", "prompt", project.lastPrompt));
     li.addEventListener("click", () => selectProject(project.realPath, li));
     el.projects.append(li);
@@ -99,7 +103,7 @@ async function loadSessions(path) {
     li.append(text("div", "title", session.title));
     const branch = session.gitBranch ? ` · ${session.gitBranch}` : "";
     li.append(text("div", "meta",
-      `${relativeTime(session.mtime)} · ${session.messageCount} msg${branch}`));
+      `${providerLabel(session.providerId)} · ${relativeTime(session.mtime)} · ${session.messageCount} msg${branch}`));
     li.addEventListener("click", () => selectSession(session.id, li));
     el.sessions.append(li);
   }
@@ -152,6 +156,18 @@ async function loadDetail(sessionId) {
     text("span", "sub", `${summary.projectPath} · ${summary.messageCount} messages`),
   );
   el.timeline.replaceChildren();
+  const artifacts = session.extensions && session.extensions.artifacts;
+  if (Array.isArray(artifacts) && artifacts.length > 0) {
+    const box = text("div", "artifacts");
+    box.append(text("div", "artifacts-title", "Artifacts"));
+    for (const artifact of artifacts) {
+      const row = text("div", "artifact");
+      row.append(text("span", "artifact-name", artifact.name));
+      if (artifact.summary) row.append(text("span", "artifact-summary", artifact.summary));
+      box.append(row);
+    }
+    el.timeline.append(box);
+  }
   for (const message of session.messages) {
     const row = text("div", `message ${message.role}`);
     row.dataset.uuid = message.uuid;

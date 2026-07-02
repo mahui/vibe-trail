@@ -3,8 +3,8 @@
 mod resumer;
 
 use vibetrail_core::{
-    search_store, ClaudeCodeProvider, CodexProvider, Project, Resumer, Scope, SearchHit, Session,
-    SessionStore, SessionSummary,
+    search_store, AntigravityProvider, ClaudeCodeProvider, CodexProvider, Project, Resumer, Scope,
+    SearchHit, Session, SessionStore, SessionSummary,
 };
 
 /// Stores are stateless (live reads, ADR-2), so each command builds one.
@@ -12,6 +12,7 @@ fn store() -> SessionStore {
     SessionStore::new(vec![
         Box::new(ClaudeCodeProvider::new(None)),
         Box::new(CodexProvider::new(None)),
+        Box::new(AntigravityProvider::new(None)),
     ])
 }
 
