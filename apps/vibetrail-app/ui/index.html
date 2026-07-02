@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>VibeTrail</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="app">
+    <aside id="sidebar">
+      <header class="pane-header">Projects</header>
+      <ul id="project-list" class="scroll"></ul>
+    </aside>
+
+    <section id="middle">
+      <header class="pane-header">
+        <input id="search-input" type="search" placeholder="Search all sessions…" autocomplete="off" />
+      </header>
+      <ul id="session-list" class="scroll"></ul>
+      <ul id="search-results" class="scroll hidden"></ul>
+    </section>
+
+    <main id="detail">
+      <header class="pane-header" id="detail-header">
+        <div id="detail-title" class="placeholder">Select a session</div>
+        <button id="resume-btn" class="hidden">▶ Resume</button>
+      </header>
+      <div id="timeline" class="scroll"></div>
+    </main>
+  </div>
+  <div id="toast" class="hidden"></div>
+  <script src="main.js"></script>
+</body>
+</html>

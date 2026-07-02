@@ -1,0 +1,240 @@
+// VibeTrail frontend: thin presentation over the Tauri IPC commands, which
+// all delegate to vibetrail-core. No business logic here.
+"use strict";
+
+const invoke = window.__TAURI__.core.invoke;
+
+const el = {
+  projects: document.getElementById("project-list"),
+  sessions: document.getElementById("session-list"),
+  results: document.getElementById("search-results"),
+  search: document.getElementById("search-input"),
+  timeline: document.getElementById("timeline"),
+  title: document.getElementById("detail-title"),
+  resume: document.getElementById("resume-btn"),
+  toast: document.getElementById("toast"),
+};
+
+const state = {
+  selectedProject: null,
+  selectedSession: null,
+  scrollTarget: null,
+};
+
+// ---- helpers ---------------------------------------------------------------
+
+function text(tag, className, content) {
+  const node = document.createElement(tag);
+  if (className) node.className = className;
+  if (content !== undefined) node.textContent = content;
+  return node;
+}
+
+function relativeTime(iso) {
+  const seconds = (Date.now() - new Date(iso).getTime()) / 1000;
+  if (seconds < 60) return "just now";
+  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
+  if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
+  if (seconds < 86400 * 30) return `${Math.floor(seconds / 86400)}d ago`;
+  return new Date(iso).toISOString().slice(0, 10);
+}
+
+function shortPath(path) {
+  const parts = path.split("/");
+  return parts[parts.length - 1] || path;
+}
+
+let toastTimer;
+function toast(message) {
+  el.toast.textContent = message;
+  el.toast.classList.remove("hidden");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.toast.classList.add("hidden"), 5000);
+}
+
+async function call(command, args) {
+  try {
+    return await invoke(command, args);
+  } catch (error) {
+    toast(String(error));
+    throw error;
+  }
+}
+
+// ---- projects (F1) ----------------------------------------------------------
+
+async function loadProjects() {
+  const projects = await call("list_projects");
+  el.projects.replaceChildren();
+  for (const project of projects) {
+    const li = document.createElement("li");
+    li.dataset.path = project.realPath;
+    const name = text("div", "name" + (project.exists ? "" : " orphaned"), shortPath(project.realPath));
+    if (!project.exists) name.append(text("span", "", "⚠"));
+    li.append(name);
+    li.append(text("div", "meta",
+      `${project.sessionCount} sessions · ${relativeTime(project.lastActive)} · ${[...project.providers].join(",")}`));
+    if (project.lastPrompt) li.append(text("div", "prompt", project.lastPrompt));
+    li.addEventListener("click", () => selectProject(project.realPath, li));
+    el.projects.append(li);
+  }
+}
+
+async function selectProject(path, li) {
+  state.selectedProject = path;
+  el.projects.querySelectorAll(".selected").forEach((n) => n.classList.remove("selected"));
+  if (li) li.classList.add("selected");
+  exitSearchMode();
+  await loadSessions(path);
+}
+
+// ---- sessions (F2) ----------------------------------------------------------
+
+async function loadSessions(path) {
+  const sessions = await call("list_sessions", { project: path });
+  el.sessions.replaceChildren();
+  for (const session of sessions) {
+    const li = document.createElement("li");
+    li.dataset.id = session.id;
+    li.append(text("div", "title", session.title));
+    const branch = session.gitBranch ? ` · ${session.gitBranch}` : "";
+    li.append(text("div", "meta",
+      `${relativeTime(session.mtime)} · ${session.messageCount} msg${branch}`));
+    li.addEventListener("click", () => selectSession(session.id, li));
+    el.sessions.append(li);
+  }
+}
+
+async function selectSession(sessionId, li) {
+  state.selectedSession = sessionId;
+  el.sessions.querySelectorAll(".selected").forEach((n) => n.classList.remove("selected"));
+  if (li) li.classList.add("selected");
+  await loadDetail(sessionId);
+}
+
+// ---- detail timeline (F3) ---------------------------------------------------
+
+function blockNode(block) {
+  switch (block.kind) {
+    case "text": {
+      return text("div", "block-text", block.text);
+    }
+    case "tool_use": {
+      const details = text("details", "block tool");
+      details.append(text("summary", "", `Tool: ${block.name}`));
+      details.append(text("pre", "", JSON.stringify(block.input, null, 2)));
+      return details;
+    }
+    case "tool_result": {
+      const details = text("details", "block result");
+      details.append(text("summary", "", `Result${block.truncated ? " (truncated)" : ""}`));
+      details.append(text("pre", "", block.summary));
+      return details;
+    }
+    case "thinking": {
+      const details = text("details", "block thinking");
+      details.append(text("summary", "", "Thinking"));
+      details.append(text("pre", "", block.text));
+      return details;
+    }
+    default:
+      return text("div", "block-text", "");
+  }
+}
+
+async function loadDetail(sessionId) {
+  const session = await call("get_session", { sessionId });
+  const summary = session.summary;
+  el.title.classList.remove("placeholder");
+  el.title.replaceChildren(
+    text("span", "", summary.title),
+    document.createElement("br"),
+    text("span", "sub", `${summary.projectPath} · ${summary.messageCount} messages`),
+  );
+  el.timeline.replaceChildren();
+  for (const message of session.messages) {
+    const row = text("div", `message ${message.role}`);
+    row.dataset.uuid = message.uuid;
+    row.append(text("div", "avatar", message.role === "user" ? "❯" : "●"));
+    const body = text("div", "body");
+    for (const block of message.blocks) body.append(blockNode(block));
+    row.append(body);
+    el.timeline.append(row);
+  }
+  const resumable = await call("can_resume", { sessionId });
+  el.resume.classList.toggle("hidden", !resumable);
+  el.resume.onclick = () => call("resume_session", { sessionId });
+  if (state.scrollTarget) {
+    const target = el.timeline.querySelector(`[data-uuid="${CSS.escape(state.scrollTarget)}"]`);
+    if (target) {
+      target.scrollIntoView({ block: "start" });
+      target.classList.add("highlight");
+    }
+    state.scrollTarget = null;
+  } else {
+    el.timeline.scrollTop = 0;
+  }
+}
+
+// ---- search (F4) --------------------------------------------------------------
+
+function exitSearchMode() {
+  el.results.classList.add("hidden");
+  el.sessions.classList.remove("hidden");
+}
+
+async function runSearch() {
+  const query = el.search.value.trim();
+  if (!query) {
+    exitSearchMode();
+    return;
+  }
+  const hits = await call("search", { query, project: state.selectedProject });
+  el.results.replaceChildren();
+  el.results.classList.remove("hidden");
+  el.sessions.classList.add("hidden");
+  if (hits.length === 0) {
+    el.results.append(text("li", "empty", `No matches for “${query}”.`));
+    return;
+  }
+  // F4: results aggregated per session.
+  const groups = new Map();
+  for (const hit of hits) {
+    if (!groups.has(hit.sessionId)) groups.set(hit.sessionId, []);
+    groups.get(hit.sessionId).push(hit);
+  }
+  for (const [sessionId, sessionHits] of groups) {
+    const first = sessionHits[0];
+    el.results.append(text("li", "group-header",
+      `${first.projectPath} · ${first.nativeSessionId.slice(0, 8)}`));
+    for (const hit of sessionHits.slice(0, 5)) {
+      const li = text("li", "hit");
+      li.append(text("div", "snippet", hit.snippet));
+      li.addEventListener("click", () => openHit(hit));
+      el.results.append(li);
+    }
+  }
+}
+
+async function openHit(hit) {
+  // Jump: select the hit's project + session, then scroll to the message.
+  state.scrollTarget = hit.messageUuid || null;
+  const projectLi = [...el.projects.children].find((li) => li.dataset.path === hit.projectPath);
+  await selectProject(hit.projectPath, projectLi);
+  el.search.value = "";
+  exitSearchMode();
+  const sessionLi = [...el.sessions.children].find((li) => li.dataset.id === hit.sessionId);
+  await selectSession(hit.sessionId, sessionLi);
+}
+
+// ---- boot --------------------------------------------------------------------
+
+el.search.addEventListener("keydown", (event) => {
+  if (event.key === "Enter") runSearch();
+  if (event.key === "Escape") {
+    el.search.value = "";
+    exitSearchMode();
+  }
+});
+
+loadProjects();
