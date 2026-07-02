@@ -3,7 +3,7 @@ mod format;
 
 use clap::error::ErrorKind;
 use clap::{Parser, Subcommand};
-use vibetrail_core::{ClaudeCodeProvider, SessionStore};
+use vibetrail_core::{ClaudeCodeProvider, CodexProvider, SessionStore};
 
 #[derive(Parser)]
 #[command(
@@ -79,7 +79,10 @@ enum Command {
 }
 
 fn store() -> SessionStore {
-    SessionStore::new(vec![Box::new(ClaudeCodeProvider::new(None))])
+    SessionStore::new(vec![
+        Box::new(ClaudeCodeProvider::new(None)),
+        Box::new(CodexProvider::new(None)),
+    ])
 }
 
 fn main() {

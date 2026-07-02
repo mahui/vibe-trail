@@ -82,33 +82,48 @@ impl SearchEngine for GrepSearchEngine<'_> {
             if scope.provider_id.as_deref().is_some_and(|id| id != provider.id()) {
                 continue;
             }
-            let roots = provider.search_roots(scope.project_path.as_deref());
-            for root in roots {
-                for entry in WalkDir::new(&root).into_iter().filter_map(|e| e.ok()) {
-                    let path = entry.path();
-                    if !entry.file_type().is_file()
-                        || path.extension().is_none_or(|ext| ext != "jsonl")
-                    {
-                        continue;
-                    }
-                    let mut matched_lines: Vec<String> = Vec::new();
-                    let cap = self.max_hits_per_file;
+            let files: Vec<PathBuf> = provider
+                .search_roots(scope.project_path.as_deref())
+                .iter()
+                .flat_map(|root| WalkDir::new(root).into_iter().filter_map(|e| e.ok()))
+                .filter(|entry| entry.file_type().is_file())
+                .map(|entry| entry.into_path())
+                .filter(|path| path.extension().is_some_and(|ext| ext == "jsonl"))
+                .collect();
+            // Multi-GB stores are normal; grep files in parallel (rg does the
+            // same). Still no index (ADR-2).
+            use rayon::prelude::*;
+            let cap = self.max_hits_per_file;
+            let file_hits: Vec<Vec<SearchHit>> = files
+                .par_iter()
+                .map(|path| {
+                    let mut matched_lines: Vec<(u64, String)> = Vec::new();
                     // sinks::UTF8 requires line numbers to be enabled.
                     let mut searcher = SearcherBuilder::new().line_number(true).build();
-                    let sink = UTF8(|_line_number, line| {
-                        matched_lines.push(line.to_string());
+                    let sink = UTF8(|line_number, line| {
+                        matched_lines.push((line_number, line.to_string()));
                         Ok(matched_lines.len() < cap)
                     });
                     if searcher.search_path(&matcher, path, sink).is_err() {
-                        continue; // unreadable/non-UTF8 file: skip, never abort search
+                        return Vec::new(); // unreadable file: skip, never abort search
                     }
-                    for line in &matched_lines {
-                        if let Some(hit) = provider.resolve_hit(path, line, query) {
-                            hits.push(hit);
-                        }
-                    }
-                }
-            }
+                    matched_lines
+                        .iter()
+                        .filter_map(|(line_number, line)| {
+                            provider.resolve_hit(path, *line_number, line, query)
+                        })
+                        .collect()
+                })
+                .collect();
+            hits.extend(file_hits.into_iter().flatten());
+            // ADR-3 degrade path: compressed transcripts the engine cannot grep.
+            hits.extend(provider.search_compressed(query, scope.project_path.as_deref()));
+        }
+        // Providers whose storage cannot narrow by project (date-organized
+        // Codex) return all hits; enforce the scope generically here.
+        if let Some(project) = scope.project_path.as_deref() {
+            let normalized = crate::store::normalize_path(project);
+            hits.retain(|hit| hit.project_path == normalized);
         }
         Ok(hits)
     }

@@ -1,0 +1,13 @@
+{"timestamp":"2026-06-10T09:00:00.000Z","type":"session_meta","payload":{"session_id":"aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee","id":"aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee","timestamp":"2026-06-10T09:00:00.000Z","cwd":"/Users/tester/demo-app","originator":"codex-tui","cli_version":"0.142.0","source":"cli","git":{"commit_hash":"896d421a8232ac1a18399cffee5aac4cffa170fc","branch":"main"}}}
+{"timestamp":"2026-06-10T09:00:00.100Z","type":"turn_context","payload":{"cwd":"/Users/tester/demo-app","model":"gpt-5","approval_policy":"on-request"}}
+{"timestamp":"2026-06-10T09:00:00.200Z","type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"<environment_context>\n<cwd>/Users/tester/demo-app</cwd>\n</environment_context>"}]}}
+{"timestamp":"2026-06-10T09:00:00.300Z","type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"Add a retry to the flaky upload"}]}}
+{"timestamp":"2026-06-10T09:00:30.000Z","type":"response_item","payload":{"type":"reasoning","id":"rs_1","summary":[{"type":"summary_text","text":"Look at the uploader first."}],"encrypted_content":"gAAAA=="}}
+{"timestamp":"2026-06-10T09:01:00.000Z","type":"response_item","payload":{"type":"function_call","id":"fc_1","name":"exec_command","arguments":"{\"cmd\":\"ls src\"}","call_id":"call_1"}}
+{"timestamp":"2026-06-10T09:01:10.000Z","type":"response_item","payload":{"type":"function_call_output","call_id":"call_1","output":"upload.rs\nmain.rs"}}
+{"timestamp":"2026-06-10T09:02:00.000Z","type":"response_item","payload":{"type":"message","role":"assistant","content":[{"type":"output_text","text":"Added retry with exponential backoff to the uploader."}]}}
+{"timestamp":"2026-06-10T09:02:00.100Z","type":"event_msg","payload":{"type":"agent_message","message":"Added retry with exponential backoff to the uploader."}}
+{"timestamp":"2026-06-10T09:02:01.000Z","type":"response_item","payload":{"type":"message","role":"developer","content":[{"type":"input_text","text":"internal developer note"}]}}
+{"timestamp":"2026-06-10T09:02:02.000Z","type":"response_item","payload":{"type":"rate_limit","limit":100}}
+{"timestamp":"2026-06-10T09:02:03.000Z","type":"future-type","payload":{"whatever":true}}
+this line is not valid json at all

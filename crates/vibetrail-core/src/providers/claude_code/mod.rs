@@ -13,6 +13,7 @@ use crate::model::{ContentBlock, Message, MessageStub, Session, SessionSummary};
 use crate::provider::{Provider, ProviderCapabilities, RawSession, ResumeSpec};
 use crate::search::SearchHit;
 use crate::store::normalize_path;
+use crate::textutil::{make_snippet, sanitize_title};
 
 use entry::{CcEntry, CcSubagentMeta};
 use pipeline::{CcParseResult, CcParseStats};
@@ -60,23 +61,6 @@ impl ClaudeCodeProvider {
         }
     }
 
-    fn sanitize_title(&self, text: &str) -> String {
-        let collapsed = text
-            .lines()
-            .map(str::trim)
-            .filter(|l| !l.is_empty())
-            .collect::<Vec<_>>()
-            .join(" ");
-        let collapsed = collapsed.trim();
-        if collapsed.chars().count() > 80 {
-            let mut truncated: String = collapsed.chars().take(79).collect();
-            truncated.push('…');
-            truncated
-        } else {
-            collapsed.to_string()
-        }
-    }
-
     fn make_summary(&self, raw: &RawSession, result: &CcParseResult) -> SessionSummary {
         let title_source = result
             .ai_title
@@ -84,7 +68,7 @@ impl ClaudeCodeProvider {
             .or(result.first_user_prompt.as_deref())
             .or(result.last_prompt.as_deref())
             .unwrap_or("");
-        let title = self.sanitize_title(title_source);
+        let title = sanitize_title(title_source);
         let title = if title.is_empty() {
             raw.native_id.chars().take(8).collect()
         } else {
@@ -305,12 +289,12 @@ impl Provider for ClaudeCodeProvider {
                 match entry.entry_type.as_deref() {
                     Some("last-prompt") => {
                         if let Some(prompt) = entry.last_prompt {
-                            return Some(self.sanitize_title(&prompt));
+                            return Some(sanitize_title(&prompt));
                         }
                     }
                     Some("ai-title") => {
                         if let Some(title) = entry.ai_title {
-                            return Some(self.sanitize_title(&title));
+                            return Some(sanitize_title(&title));
                         }
                     }
                     _ => {}
@@ -328,7 +312,7 @@ impl Provider for ClaudeCodeProvider {
             };
             let trimmed = text.trim();
             if !trimmed.is_empty() && !trimmed.starts_with('<') {
-                return Some(self.sanitize_title(trimmed));
+                return Some(sanitize_title(trimmed));
             }
         }
         None
@@ -360,7 +344,7 @@ impl Provider for ClaudeCodeProvider {
             .collect()
     }
 
-    fn resolve_hit(&self, file: &Path, line: &str, query: &str) -> Option<SearchHit> {
+    fn resolve_hit(&self, file: &Path, _line_number: u64, line: &str, query: &str) -> Option<SearchHit> {
         let entry = serde_json::from_str::<CcEntry>(line).ok()?;
         if !matches!(entry.entry_type.as_deref(), Some("user") | Some("assistant"))
             || entry.is_meta == Some(true)
@@ -452,24 +436,3 @@ fn collect_string_leaves(value: &Value, out: &mut Vec<String>) {
     }
 }
 
-fn make_snippet(texts: &[String], query: &str) -> Option<String> {
-    let query_lower = query.to_lowercase();
-    for text in texts {
-        let lower = text.to_lowercase();
-        let Some(byte_start) = lower.find(&query_lower) else { continue };
-        // Map the byte offset onto char indices for safe ±context slicing.
-        // Counting on `lower` keeps the slice on a valid boundary even when
-        // case-folding changed byte lengths.
-        let chars: Vec<char> = text.chars().collect();
-        let char_start = lower[..byte_start].chars().count().min(chars.len());
-        let match_chars = query.chars().count();
-        let from = char_start.saturating_sub(60);
-        let to = (char_start + match_chars + 100).min(chars.len());
-        let mut snippet: String = chars[from..to].iter().collect();
-        snippet = snippet.split_whitespace().collect::<Vec<_>>().join(" ");
-        let prefix = if from > 0 { "…" } else { "" };
-        let suffix = if to < chars.len() { "…" } else { "" };
-        return Some(format!("{prefix}{snippet}{suffix}"));
-    }
-    None
-}

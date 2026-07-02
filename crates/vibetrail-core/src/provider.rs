@@ -75,7 +75,22 @@ pub trait Provider: Send + Sync {
     /// Map one grep-matched line back to a session/message. Return None to
     /// drop the hit (e.g. the match landed in structural metadata, not
     /// message text). Keeps format knowledge inside the provider.
-    fn resolve_hit(&self, _file: &Path, _line: &str, _query: &str) -> Option<SearchHit> {
+    /// `line_number` is 1-based; providers whose messages carry no intrinsic
+    /// id (Codex) anchor on it instead.
+    fn resolve_hit(
+        &self,
+        _file: &Path,
+        _line_number: u64,
+        _line: &str,
+        _query: &str,
+    ) -> Option<SearchHit> {
         None
+    }
+
+    /// ADR-3 degrade path: sessions the grep engine cannot read as plain text
+    /// (e.g. Codex `.jsonl.zst`) are searched inside the provider. Results
+    /// are appended to the engine's own hits.
+    fn search_compressed(&self, _query: &str, _project_path: Option<&str>) -> Vec<SearchHit> {
+        Vec::new()
     }
 }

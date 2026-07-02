@@ -78,8 +78,9 @@ impl SessionStore {
         for session in &sessions {
             grouped.entry(session.project_path.clone()).or_default().push(session);
         }
+        use rayon::prelude::*;
         let mut projects: Vec<Project> = grouped
-            .into_iter()
+            .into_par_iter()
             .map(|(path, group)| {
                 let newest = group.iter().max_by_key(|s| s.mtime).unwrap();
                 let last_prompt = self

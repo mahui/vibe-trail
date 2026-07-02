@@ -15,3 +15,8 @@ grep-regex = "0.1"
 grep-searcher = "0.1"
 walkdir = "2"
 dirs = "6"
+zstd = "0.13"
+rayon = "1"
+
+[dev-dependencies]
+tempfile = "3"

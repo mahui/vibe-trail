@@ -83,7 +83,8 @@ pub trait Provider: Send + Sync {
     fn summarize(&self, raw: &RawSession) -> Result<SessionSummary>; // 默认实现 = parse().summary
     // 搜索适配(可 grep 的 provider 覆写;默认空 → 该 provider 不参与全文搜索)
     fn search_roots(&self, project_path: Option<&str>) -> Vec<PathBuf>;
-    fn resolve_hit(&self, file: &Path, line: &str, query: &str) -> Option<SearchHit>;
+    fn resolve_hit(&self, file: &Path, line_number: u64, line: &str, query: &str) -> Option<SearchHit>;
+    fn search_compressed(&self, query: &str, project_path: Option<&str>) -> Vec<SearchHit>; // ADR-3 降级路径,默认空
 }
 
 pub struct ProviderCapabilities {
@@ -94,7 +95,7 @@ pub struct ProviderCapabilities {
 }
 ```
 
-搜索引擎对 `search_roots` 做库内 grep,把命中行交回所属 provider 的 `resolve_hit` 解析出 session/message 定位——格式知识不出 provider。
+搜索引擎对 `search_roots` 做库内并行 grep,把命中行(含 1-based 行号)交回所属 provider 的 `resolve_hit` 解析出 session/message 定位——格式知识不出 provider。消息无内在 id 的 provider(Codex)用 `L<行号>` 作为 message uuid 锚点。存储无法按项目收窄的 provider(Codex 按日期组织)返回全量 roots,引擎在解析后按 scope 统一过滤 project_path。压缩会话走 `search_compressed` 降级路径。发现与搜索均用 rayon 并行 I/O——仍无索引、无缓存(ADR-2 不变)。
 
 - **项目是派生属性,不是存储属性。** 各 provider 从元数据提取 cwd,Core 归一化(展开 ~、resolve symlink)后聚合分组。CC 的目录结构只是恰好预分好组。
 - **统一 `Session` 模型取最小公倍数**(消息序列、角色、时间戳、cwd、provider id)+ provider 扩展字段(`extensions: [String: Codable]`)。CC 的 subagent 树、AGY 的 artifacts 走扩展字段,不塞进通用模型。
@@ -133,9 +134,15 @@ entry 解析 → 分类过滤 → 消息重组 → 树重建 → 展示转换
 
 ### 4.2 Codex(v1.1)
 
-**存储:** `~/.codex/sessions/YYYY/MM/DD/rollout-<timestamp>-<session-id>.jsonl`,按日期组织;首行为 `session_meta` 元数据块(含 cwd);老会话压缩为 `.jsonl.zst`,需解压后解析。
-**Resume:** Codex 自有 resume 机制,实现时核对当期 CLI 参数。
-**注意:** 项目分组完全依赖 session_meta 的 cwd 提取。
+**存储:** `~/.codex/sessions/YYYY/MM/DD/rollout-<timestamp>-<session-id>.jsonl`,按日期组织;可能存在 `.jsonl.zst` 压缩变体,解压后解析。每行 `{timestamp, type, payload}`:
+- `session_meta`(首行): cwd、git.branch、session id——项目分组完全依赖它的 cwd;
+- `response_item`: 唯一取信的消息来源。白名单 payload.type: `message`(role user/assistant;developer 忽略;`<environment_context>`/`<user_instructions>` 开头的 user 文本是注入上下文,过滤)、`reasoning`(仅 summary 可显示,encrypted_content 不可用)、`function_call`/`custom_tool_call`(arguments 为 JSON 编码字符串,解码展示)、`*_output`、`web_search_call`;
+- `event_msg` 全部忽略——`agent_message`/`user_message` 与 response_item 内容重复,取信会导致消息翻倍;
+- 未知 type/payload(如 `ghost_snapshot`)忽略 + 计数。
+
+会话线性,无流式分行、无重复 UUID、无 parent-child 树(CC 四规则不适用,留在 CC provider 内)。消息无内在 id,以 `L<1-based 行号>` 为 uuid,搜索命中据此锚定跳转。
+**Resume:** `codex resume <session-id>`(先 cd 到项目路径)。
+**规模注意:** 数万 rollout 文件属正常(本机 1.9 万+),discover 的首行读取必须并行。
 
 ### 4.3 Antigravity(v1.2,experimental)
 
