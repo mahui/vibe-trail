@@ -117,13 +117,14 @@ impl SessionStore {
         Ok(projects)
     }
 
-    /// F2: sessions of one project, newest first.
-    pub fn sessions(
+    /// F2 discovery half: every session handle of one project, newest first.
+    /// Metadata only — pair with `summarize_handles` to page in summaries
+    /// without re-running discovery per page.
+    pub fn session_handles(
         &self,
         project_path: &str,
         provider_id: Option<&str>,
-        limit: Option<usize>,
-    ) -> Result<Vec<SessionSummary>> {
+    ) -> Result<Vec<RawSession>> {
         let normalized = normalize_path(project_path);
         let mut raws: Vec<RawSession> = self
             .discover_all(provider_id)?
@@ -131,16 +132,32 @@ impl SessionStore {
             .filter(|raw| raw.project_path == normalized)
             .collect();
         raws.sort_by_key(|raw| std::cmp::Reverse(raw.mtime));
+        Ok(raws)
+    }
+
+    /// F2 summary half: parallel full-parse of a page of handles, order
+    /// preserved. Handles whose files vanished since discovery (agents prune
+    /// old sessions) are skipped, never fatal.
+    pub fn summarize_handles(&self, handles: &[RawSession]) -> Vec<SessionSummary> {
+        use rayon::prelude::*;
+        handles
+            .par_iter()
+            .filter_map(|raw| self.provider(&raw.provider_id)?.summarize(raw).ok())
+            .collect()
+    }
+
+    /// F2: sessions of one project, newest first.
+    pub fn sessions(
+        &self,
+        project_path: &str,
+        provider_id: Option<&str>,
+        limit: Option<usize>,
+    ) -> Result<Vec<SessionSummary>> {
+        let mut raws = self.session_handles(project_path, provider_id)?;
         if let Some(limit) = limit {
             raws.truncate(limit);
         }
-        raws.iter()
-            .map(|raw| {
-                self.provider(&raw.provider_id)
-                    .ok_or_else(|| Error::Data(format!("Unknown provider {}", raw.provider_id)))?
-                    .summarize(raw)
-            })
-            .collect()
+        Ok(self.summarize_handles(&raws))
     }
 
     /// Resolve a user-supplied project reference: absolute/relative path or a

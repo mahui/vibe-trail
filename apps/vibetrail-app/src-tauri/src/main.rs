@@ -7,8 +7,8 @@ mod config;
 mod resumer;
 
 use vibetrail_core::{
-    search_store, AntigravityProvider, ClaudeCodeProvider, CodexProvider, Project, Scope,
-    SearchHit, Session, SessionStore, SessionSummary,
+    search_store, AntigravityProvider, ClaudeCodeProvider, CodexProvider, Project, RawSession,
+    Scope, SearchHit, Session, SessionStore, SessionSummary,
 };
 
 /// Stores are stateless (live reads, ADR-2), so each command builds one.
@@ -25,15 +25,19 @@ fn list_projects() -> Result<Vec<Project>, String> {
     store().projects().map_err(|e| e.to_string())
 }
 
-/// F2 with a hard cap: a 700-session project must not full-parse everything
-/// on one click. The frontend shows a "latest N" notice when it hits the cap.
-const SESSION_LIST_CAP: usize = 100;
+/// F2 in two halves so a 700-session project neither full-parses everything
+/// on one click nor re-discovers the whole store per scroll page: the
+/// frontend fetches handles once, then trades pages of them for summaries.
+#[tauri::command]
+fn list_session_handles(project: String) -> Result<Vec<RawSession>, String> {
+    store()
+        .session_handles(&project, None)
+        .map_err(|e| e.to_string())
+}
 
 #[tauri::command]
-fn list_sessions(project: String) -> Result<Vec<SessionSummary>, String> {
-    store()
-        .sessions(&project, None, Some(SESSION_LIST_CAP))
-        .map_err(|e| e.to_string())
+fn summarize_sessions(handles: Vec<RawSession>) -> Vec<SessionSummary> {
+    store().summarize_handles(&handles)
 }
 
 #[tauri::command]
@@ -106,7 +110,8 @@ fn main() {
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![
             list_projects,
-            list_sessions,
+            list_session_handles,
+            summarize_sessions,
             get_session,
             search,
             can_resume,

@@ -103,23 +103,73 @@ async function selectProject(path, li) {
 
 // ---- sessions (F2) ----------------------------------------------------------
 
-const SESSION_LIST_CAP = 100;
+// F2 continuous loading: one cheap handle fetch per project, then pages of
+// summaries (parallel-parsed backend-side) as the list scrolls.
+const SESSION_PAGE = 50;
+const sessionState = {
+  handles: [],
+  loaded: 0,
+  generation: 0,
+  sentinel: null,
+  observer: null,
+  loading: false,
+};
+
+function sessionRow(session) {
+  const li = document.createElement("li");
+  li.dataset.id = session.id;
+  li.append(text("div", "title", session.title));
+  const branch = session.gitBranch ? ` · ${session.gitBranch}` : "";
+  li.append(text("div", "meta",
+    `${providerLabel(session.providerId)} · ${relativeTime(session.mtime)} · ${session.messageCount} msg${branch}`));
+  li.addEventListener("click", () => selectSession(session.id, li));
+  return li;
+}
 
 async function loadSessions(path) {
-  const sessions = await call("list_sessions", { project: path });
+  const generation = ++sessionState.generation;
   el.sessions.replaceChildren();
-  if (sessions.length >= SESSION_LIST_CAP) {
-    el.sessions.append(text("li", "notice", `Showing the latest ${SESSION_LIST_CAP} sessions`));
+  const handles = await call("list_session_handles", { project: path });
+  if (generation !== sessionState.generation) return; // superseded click
+  sessionState.handles = handles;
+  sessionState.loaded = 0;
+  sessionState.loading = false;
+  if (sessionState.observer) sessionState.observer.disconnect();
+  const sentinel = text("li", "notice", "Loading…");
+  sessionState.sentinel = sentinel;
+  el.sessions.append(sentinel);
+  sessionState.observer = new IntersectionObserver((entries) => {
+    if (entries.some((entry) => entry.isIntersecting)) loadNextSessionPage();
+  }, { root: el.sessions, rootMargin: "400px" });
+  sessionState.observer.observe(sentinel);
+  await loadNextSessionPage();
+}
+
+async function loadNextSessionPage() {
+  if (sessionState.loading || sessionState.loaded >= sessionState.handles.length) return;
+  sessionState.loading = true;
+  const generation = sessionState.generation;
+  const page = sessionState.handles.slice(
+    sessionState.loaded, sessionState.loaded + SESSION_PAGE);
+  const summaries = await call("summarize_sessions", { handles: page });
+  if (generation !== sessionState.generation) return; // project changed mid-fetch
+  const fragment = document.createDocumentFragment();
+  for (const session of summaries) fragment.append(sessionRow(session));
+  el.sessions.insertBefore(fragment, sessionState.sentinel);
+  sessionState.loaded += page.length;
+  const remaining = sessionState.handles.length - sessionState.loaded;
+  if (remaining > 0) {
+    sessionState.sentinel.textContent = `Loading… (${remaining} more)`;
+  } else {
+    sessionState.sentinel.classList.add("hidden");
+    sessionState.observer.disconnect();
   }
-  for (const session of sessions) {
-    const li = document.createElement("li");
-    li.dataset.id = session.id;
-    li.append(text("div", "title", session.title));
-    const branch = session.gitBranch ? ` · ${session.gitBranch}` : "";
-    li.append(text("div", "meta",
-      `${providerLabel(session.providerId)} · ${relativeTime(session.mtime)} · ${session.messageCount} msg${branch}`));
-    li.addEventListener("click", () => selectSession(session.id, li));
-    el.sessions.append(li);
+  sessionState.loading = false;
+  // The pane may still show the sentinel (short lists): keep filling.
+  if (remaining > 0) {
+    const rect = sessionState.sentinel.getBoundingClientRect();
+    const pane = el.sessions.getBoundingClientRect();
+    if (rect.top < pane.bottom + 200) loadNextSessionPage();
   }
 }
 

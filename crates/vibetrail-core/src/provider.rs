@@ -16,8 +16,10 @@ pub struct ProviderCapabilities {
 }
 
 /// Metadata-level handle to a stored session, produced by discovery without
-/// parsing the transcript body.
-#[derive(Debug, Clone)]
+/// parsing the transcript body. Serializable so shells can hold a page of
+/// handles and trade them back for summaries without re-discovering.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct RawSession {
     pub provider_id: String,
     pub native_id: String,
