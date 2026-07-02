@@ -1,6 +1,6 @@
 # VibeTrail
 
-多 agent 会话浏览与恢复工具(macOS 原生 App + CLI,开源)。浏览、搜索 Claude Code / Codex / Antigravity 的历史会话,一键 resume。
+多 agent 会话浏览与恢复工具(Tauri App + CLI,Rust workspace,开源)。浏览、搜索 Claude Code / Codex / Antigravity 的历史会话,一键 resume。
 
 ## 文档
 
@@ -8,11 +8,11 @@
 
 ## 架构铁律
 
-- 一份 Core(`VibeTrailCore`)+ 两个薄壳(CLI `vibetrail` / SwiftUI App)+ N 个 Provider。业务逻辑只许在 Core,壳层发现逻辑必须下沉。
-- Core 不 import AppKit/SwiftUI;壳层不直接碰任何 agent 存储目录。
+- 一份 Core(`vibetrail-core`)+ 两个薄壳(CLI `vibetrail-cli` / Tauri App)+ N 个 Provider。业务逻辑只许在 Core,壳层发现逻辑必须下沉。
+- Core 不依赖 tauri/任何 GUI crate;壳层不直接碰任何 agent 存储目录。Tauri 前端保持纯静态 HTML/CSS/JS,不引入 Node 构建链。
 - Provider 之间零依赖;provider 特有逻辑禁止泄漏到 Core 通用层。项目分组是从 cwd 派生的,不是存储属性。
-- 无数据库、无索引、无常驻进程、无 FS watcher。搜索 shell out ripgrep。
-- v1 只实现 ClaudeCode provider;Provider 协议与 capabilities 见 TECH_SPEC 第 3 节。
+- 无数据库、无索引、无常驻进程、无 FS watcher。搜索 link ripgrep 引擎 crates(grep-searcher/grep-regex),无外部 rg 依赖。
+- v1 只实现 ClaudeCode provider;Provider trait 与 capabilities 见 TECH_SPEC 第 3 节。
 
 ## Claude Code Provider 解析四规则(违反即 bug)
 
