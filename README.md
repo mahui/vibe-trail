@@ -21,9 +21,10 @@ closes the loop: **browse → search → resume**.
 - **One inbox for every agent.** A provider abstraction unifies session
   history behind a single UI and CLI.
 - **Lightweight by design.** No database, no index, no background process, no
-  file watcher. Files are read live; search shells out to ripgrep.
-- **Two entry points.** A native macOS app and a `vibetrail` CLI (JSON output
-  for scripting).
+  file watcher. Files are read live; search links the ripgrep engine crates
+  directly.
+- **Two entry points.** A macOS app (Tauri) and a `vibetrail` CLI (JSON
+  output for scripting).
 
 ## Status
 
@@ -35,19 +36,22 @@ closes the loop: **browse → search → resume**.
 
 ## Requirements
 
-- macOS 14+
-- [ripgrep](https://github.com/BurntSushi/ripgrep) (`brew install ripgrep`)
-- Swift 6 toolchain (to build from source)
+- macOS 14+ (primary target; the core and CLI are portable Rust)
+- Rust toolchain (to build from source)
 
 ## Build
 
 ```sh
-swift build -c release
 # CLI
-.build/release/vibetrail --help
-# GUI
-swift run VibeTrailApp
+cargo build --release -p vibetrail-cli
+target/release/vibetrail --help
+
+# GUI (Tauri v2; dev run)
+cargo run -p vibetrail-app
 ```
+
+Search is built in (the ripgrep engine crates are linked directly) — no
+external `rg` binary required.
 
 ## CLI
 
@@ -71,13 +75,13 @@ precondition failed · `4` operation unsupported by provider.
   opened strictly read-only.
 - Resume validates that the project path still exists before launching
   anything.
-- The GUI's resume uses macOS Automation (AppleScript → Terminal); you will be
+- The GUI's resume uses macOS Automation (osascript → Terminal); you will be
   asked for permission on first use.
 
 ## Contributing
 
 Provider implementations are self-contained under
-`Sources/VibeTrailCore/Providers/`. New providers are welcome — the bar is
+`crates/vibetrail-core/src/providers/`. New providers are welcome — the bar is
 that all capabilities must work by reading files only (no host process, no
 reverse-engineered binary formats). See `TECH_SPEC.md` for the provider
 protocol and parsing rules.
