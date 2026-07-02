@@ -24,6 +24,10 @@ let package = Package(
                 .product(name: "ArgumentParser", package: "swift-argument-parser"),
             ]
         ),
+        .executableTarget(
+            name: "VibeTrailApp",
+            dependencies: ["VibeTrailCore"]
+        ),
         .testTarget(
             name: "VibeTrailCoreTests",
             dependencies: ["VibeTrailCore"],
