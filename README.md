@@ -7,7 +7,7 @@
 <p align="center"><b>Session browser &amp; resume for coding agents — Claude Code, Codex, Antigravity, and yours next.</b></p>
 
 <p align="center">
-  <a href="https://github.com/mahui/vibe-trail/actions"><img src="https://img.shields.io/github/actions/workflow/status/vibetrail/vibetrail/ci.yml?branch=main" alt="CI" /></a>
+  <a href="https://github.com/mahui/vibe-trail/actions"><img src="https://img.shields.io/github/actions/workflow/status/mahui/vibe-trail/ci.yml?branch=main" alt="CI" /></a>
   <img src="https://img.shields.io/badge/license-Apache--2.0-blue" alt="License" />
   <img src="https://img.shields.io/badge/platform-macOS%2014%2B-lightgrey" alt="Platform" />
   <img src="https://img.shields.io/badge/built%20with-Rust%20%2B%20Tauri-orange" alt="Stack" />
