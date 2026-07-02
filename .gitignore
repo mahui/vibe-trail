@@ -1,7 +1,3 @@
 .DS_Store
-/.build
-/Packages
-xcuserdata/
-DerivedData/
-.swiftpm/
-.netrc
+/target
+apps/vibetrail-app/src-tauri/gen/

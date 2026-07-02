@@ -1,0 +1,17 @@
+[package]
+name = "vibetrail-core"
+description = "Unified models, provider trait, search and resume orchestration for VibeTrail"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+chrono.workspace = true
+thiserror = "2"
+grep-regex = "0.1"
+grep-searcher = "0.1"
+walkdir = "2"
+dirs = "6"
