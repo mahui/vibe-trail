@@ -97,7 +97,7 @@ impl SessionStore {
                 }
             })
             .collect();
-        projects.sort_by(|a, b| b.last_active.cmp(&a.last_active));
+        projects.sort_by_key(|project| std::cmp::Reverse(project.last_active));
         Ok(projects)
     }
 
@@ -114,7 +114,7 @@ impl SessionStore {
             .into_iter()
             .filter(|raw| raw.project_path == normalized)
             .collect();
-        raws.sort_by(|a, b| b.mtime.cmp(&a.mtime));
+        raws.sort_by_key(|raw| std::cmp::Reverse(raw.mtime));
         if let Some(limit) = limit {
             raws.truncate(limit);
         }
