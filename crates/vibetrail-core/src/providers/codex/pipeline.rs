@@ -43,7 +43,9 @@ pub fn is_context_payload(text: &str) -> bool {
 }
 
 fn parse_timestamp(value: Option<&str>) -> Option<DateTime<Utc>> {
-    DateTime::parse_from_rfc3339(value?).ok().map(|dt| dt.with_timezone(&Utc))
+    DateTime::parse_from_rfc3339(value?)
+        .ok()
+        .map(|dt| dt.with_timezone(&Utc))
 }
 
 /// Rollout transcripts are linear: no streaming splits, no duplicate UUIDs,
@@ -80,8 +82,7 @@ pub fn run(data: &[u8]) -> CodexParseResult {
             }
             Some("response_item") => {
                 let payload = entry.payload.unwrap_or(Value::Null);
-                if let Some((role, blocks)) = transform_response_item(&payload, &mut result.stats)
-                {
+                if let Some((role, blocks)) = transform_response_item(&payload, &mut result.stats) {
                     if role == Role::User && result.first_user_prompt.is_none() {
                         if let Some(ContentBlock::Text { text }) = blocks.first() {
                             result.first_user_prompt = Some(text.trim().to_string());
@@ -123,7 +124,11 @@ fn transform_response_item(
                 }
             };
             let mut texts: Vec<String> = Vec::new();
-            for item in payload.get("content").and_then(Value::as_array).unwrap_or(&Vec::new()) {
+            for item in payload
+                .get("content")
+                .and_then(Value::as_array)
+                .unwrap_or(&Vec::new())
+            {
                 if let Some(text) = item.get("text").and_then(Value::as_str) {
                     if !text.is_empty() {
                         texts.push(text.to_string());
@@ -134,8 +139,10 @@ fn transform_response_item(
                 stats.context_user_messages += 1;
                 return None;
             }
-            let blocks: Vec<ContentBlock> =
-                texts.into_iter().map(|text| ContentBlock::Text { text }).collect();
+            let blocks: Vec<ContentBlock> = texts
+                .into_iter()
+                .map(|text| ContentBlock::Text { text })
+                .collect();
             if blocks.is_empty() {
                 return None;
             }
@@ -157,11 +164,19 @@ fn transform_response_item(
                 stats.empty_reasoning += 1;
                 return None;
             }
-            Some((Role::Assistant, vec![ContentBlock::Thinking { text: summary.join("\n") }]))
+            Some((
+                Role::Assistant,
+                vec![ContentBlock::Thinking {
+                    text: summary.join("\n"),
+                }],
+            ))
         }
         Some("function_call") | Some("custom_tool_call") => {
-            let name =
-                payload.get("name").and_then(Value::as_str).unwrap_or("?").to_string();
+            let name = payload
+                .get("name")
+                .and_then(Value::as_str)
+                .unwrap_or("?")
+                .to_string();
             // `arguments`/`input` is a JSON-encoded string; decode for display.
             let raw_input = payload
                 .get("arguments")
@@ -180,7 +195,10 @@ fn transform_response_item(
             let full = payload.get("output").and_then(Value::as_str).unwrap_or("");
             let summary: String = full.chars().take(200).collect();
             let truncated = full.chars().count() > 200;
-            Some((Role::User, vec![ContentBlock::ToolResult { summary, truncated }]))
+            Some((
+                Role::User,
+                vec![ContentBlock::ToolResult { summary, truncated }],
+            ))
         }
         Some("web_search_call") => Some((
             Role::Assistant,
@@ -203,7 +221,11 @@ pub fn searchable_texts(payload: &Value) -> Vec<String> {
     let mut texts = Vec::new();
     match payload.get("type").and_then(Value::as_str) {
         Some("message") => {
-            for item in payload.get("content").and_then(Value::as_array).unwrap_or(&Vec::new()) {
+            for item in payload
+                .get("content")
+                .and_then(Value::as_array)
+                .unwrap_or(&Vec::new())
+            {
                 if let Some(text) = item.get("text").and_then(Value::as_str) {
                     if !is_context_payload(text) {
                         texts.push(text.to_string());

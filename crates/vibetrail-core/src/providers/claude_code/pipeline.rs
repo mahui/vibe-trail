@@ -185,7 +185,9 @@ fn regroup_by_message_id(entries: Vec<CcEntry>) -> Vec<LogicalMessage> {
             }
         }
         let message = LogicalMessage {
-            uuid: entry.uuid.unwrap_or_else(|| format!("<no-uuid-{fallback_counter}>")),
+            uuid: entry
+                .uuid
+                .unwrap_or_else(|| format!("<no-uuid-{fallback_counter}>")),
             parent_uuid: entry.parent_uuid,
             role,
             timestamp: parse_timestamp(entry.timestamp.as_deref())
@@ -244,7 +246,10 @@ fn tree_order(messages: Vec<LogicalMessage>) -> Vec<LogicalMessage> {
         }
     }
     let mut slots: Vec<Option<LogicalMessage>> = messages.into_iter().map(Some).collect();
-    order.into_iter().map(|index| slots[index].take().unwrap()).collect()
+    order
+        .into_iter()
+        .map(|index| slots[index].take().unwrap())
+        .collect()
 }
 
 // ---- Stage 5: display transform ---------------------------------------------
@@ -263,14 +268,18 @@ fn transform(messages: Vec<LogicalMessage>, stats: &mut CcParseStats) -> Vec<Mes
                 Some("text") => {
                     if let Some(text) = block.get("text").and_then(Value::as_str) {
                         if !text.is_empty() {
-                            blocks.push(ContentBlock::Text { text: text.to_string() });
+                            blocks.push(ContentBlock::Text {
+                                text: text.to_string(),
+                            });
                         }
                     }
                 }
                 Some("thinking") => {
                     if let Some(text) = block.get("thinking").and_then(Value::as_str) {
                         if !text.is_empty() {
-                            blocks.push(ContentBlock::Thinking { text: text.to_string() });
+                            blocks.push(ContentBlock::Thinking {
+                                text: text.to_string(),
+                            });
                         }
                     }
                 }

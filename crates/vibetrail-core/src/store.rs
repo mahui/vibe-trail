@@ -19,10 +19,16 @@ pub fn normalize_path(path: &str) -> String {
     } else {
         PathBuf::from(path)
     };
-    let resolved = expanded.canonicalize().unwrap_or_else(|_| lexical_clean(&expanded));
+    let resolved = expanded
+        .canonicalize()
+        .unwrap_or_else(|_| lexical_clean(&expanded));
     let text = resolved.to_string_lossy();
     let trimmed = text.trim_end_matches('/');
-    if trimmed.is_empty() { "/".to_string() } else { trimmed.to_string() }
+    if trimmed.is_empty() {
+        "/".to_string()
+    } else {
+        trimmed.to_string()
+    }
 }
 
 fn lexical_clean(path: &Path) -> PathBuf {
@@ -55,7 +61,10 @@ impl SessionStore {
     }
 
     pub fn provider(&self, id: &str) -> Option<&dyn Provider> {
-        self.providers.iter().find(|p| p.id() == id).map(|p| p.as_ref())
+        self.providers
+            .iter()
+            .find(|p| p.id() == id)
+            .map(|p| p.as_ref())
     }
 
     pub fn discover_all(&self, provider_id: Option<&str>) -> Result<Vec<RawSession>> {
@@ -76,7 +85,10 @@ impl SessionStore {
         let mut grouped: std::collections::HashMap<String, Vec<&RawSession>> =
             std::collections::HashMap::new();
         for session in &sessions {
-            grouped.entry(session.project_path.clone()).or_default().push(session);
+            grouped
+                .entry(session.project_path.clone())
+                .or_default()
+                .push(session);
         }
         use rayon::prelude::*;
         let mut projects: Vec<Project> = grouped
@@ -94,7 +106,10 @@ impl SessionStore {
                     session_count: group.len(),
                     last_active: newest.mtime,
                     last_prompt,
-                    providers: group.iter().map(|s| s.provider_id.clone()).collect::<BTreeSet<_>>(),
+                    providers: group
+                        .iter()
+                        .map(|s| s.provider_id.clone())
+                        .collect::<BTreeSet<_>>(),
                 }
             })
             .collect();
@@ -152,7 +167,11 @@ impl SessionStore {
             0 => Err(Error::Data(format!("No project matches \"{reference}\""))),
             _ => Err(Error::Usage(format!(
                 "Ambiguous project \"{reference}\": {}",
-                suffix_matches.iter().map(|s| s.as_str()).collect::<Vec<_>>().join(", ")
+                suffix_matches
+                    .iter()
+                    .map(|s| s.as_str())
+                    .collect::<Vec<_>>()
+                    .join(", ")
             ))),
         }
     }
@@ -180,7 +199,12 @@ impl SessionStore {
             0 => Err(Error::Data(format!("No session matches \"{reference}\""))),
             _ => Err(Error::Usage(format!(
                 "Ambiguous session id \"{reference}\": {}…",
-                matches.iter().take(5).map(|raw| raw.composite_id()).collect::<Vec<_>>().join(", ")
+                matches
+                    .iter()
+                    .take(5)
+                    .map(|raw| raw.composite_id())
+                    .collect::<Vec<_>>()
+                    .join(", ")
             ))),
         }
     }

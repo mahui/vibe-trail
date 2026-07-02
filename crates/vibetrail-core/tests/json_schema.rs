@@ -87,13 +87,20 @@ fn message_blocks_snapshot() {
         parent_uuid: Some("u1".to_string()),
         role: Role::Assistant,
         blocks: vec![
-            ContentBlock::Text { text: "Let me look.".to_string() },
+            ContentBlock::Text {
+                text: "Let me look.".to_string(),
+            },
             ContentBlock::ToolUse {
                 name: "Read".to_string(),
                 input: serde_json::json!({ "file_path": "/tmp/x" }),
             },
-            ContentBlock::ToolResult { summary: "ok".to_string(), truncated: false },
-            ContentBlock::Thinking { text: "hmm".to_string() },
+            ContentBlock::ToolResult {
+                summary: "ok".to_string(),
+                truncated: false,
+            },
+            ContentBlock::Thinking {
+                text: "hmm".to_string(),
+            },
         ],
         timestamp: fixed_time(),
     };

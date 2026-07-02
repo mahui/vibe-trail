@@ -31,7 +31,10 @@ pub struct ClaudeCodeProvider {
 impl ClaudeCodeProvider {
     pub fn new(root: Option<PathBuf>) -> Self {
         let root = root.unwrap_or_else(|| {
-            dirs::home_dir().unwrap_or_default().join(".claude").join("projects")
+            dirs::home_dir()
+                .unwrap_or_default()
+                .join(".claude")
+                .join("projects")
         });
         Self { root }
     }
@@ -41,7 +44,9 @@ impl ClaudeCodeProvider {
     fn extract_cwd(&self, file: &Path) -> Option<String> {
         let head = read_head(file, BOUNDED_READ)?;
         for line in head.split(|&b| b == b'\n').take(40) {
-            let Ok(value) = serde_json::from_slice::<Value>(line) else { continue };
+            let Ok(value) = serde_json::from_slice::<Value>(line) else {
+                continue;
+            };
             if let Some(cwd) = value.get("cwd").and_then(Value::as_str) {
                 if !cwd.is_empty() {
                     return Some(cwd.to_string());
@@ -101,7 +106,9 @@ impl ClaudeCodeProvider {
     /// pipeline — never fused into the main pass.
     fn parse_subagents(&self, raw: &RawSession) -> Vec<Value> {
         let dir = raw.file_path.with_extension("").join("subagents");
-        let Ok(entries) = fs::read_dir(&dir) else { return Vec::new() };
+        let Ok(entries) = fs::read_dir(&dir) else {
+            return Vec::new();
+        };
         let mut files: Vec<PathBuf> = entries
             .filter_map(|e| e.ok())
             .map(|e| e.path())
@@ -165,8 +172,13 @@ impl ClaudeCodeProvider {
         match message.blocks.first() {
             Some(ContentBlock::ToolUse { name, .. }) => format!("⚙ {name}"),
             Some(ContentBlock::ToolResult { summary, .. }) => {
-                let line: String =
-                    summary.lines().next().unwrap_or("").chars().take(100).collect();
+                let line: String = summary
+                    .lines()
+                    .next()
+                    .unwrap_or("")
+                    .chars()
+                    .take(100)
+                    .collect();
                 format!("→ {line}")
             }
             Some(ContentBlock::Thinking { .. }) => "(thinking)".to_string(),
@@ -201,7 +213,9 @@ impl Provider for ClaudeCodeProvider {
             }
             // Only top-level <session-uuid>.jsonl files; subagent transcripts
             // live under <session-uuid>/subagents/ and are not sessions.
-            let Ok(files) = fs::read_dir(&dir) else { continue };
+            let Ok(files) = fs::read_dir(&dir) else {
+                continue;
+            };
             let mut jsonl_files: Vec<PathBuf> = files
                 .filter_map(|e| e.ok())
                 .map(|e| e.path())
@@ -308,7 +322,9 @@ impl Provider for ClaudeCodeProvider {
             // First chunk may be a partial line; its decode just fails and is
             // skipped.
             for line in tail.split(|&b| b == b'\n').rev() {
-                let Ok(entry) = serde_json::from_slice::<CcEntry>(line) else { continue };
+                let Ok(entry) = serde_json::from_slice::<CcEntry>(line) else {
+                    continue;
+                };
                 match entry.entry_type.as_deref() {
                     Some("last-prompt") => {
                         if let Some(prompt) = entry.last_prompt {
@@ -326,7 +342,9 @@ impl Provider for ClaudeCodeProvider {
         }
         let head = read_head(&raw.file_path, BOUNDED_READ)?;
         for line in head.split(|&b| b == b'\n') {
-            let Ok(entry) = serde_json::from_slice::<CcEntry>(line) else { continue };
+            let Ok(entry) = serde_json::from_slice::<CcEntry>(line) else {
+                continue;
+            };
             if entry.entry_type.as_deref() != Some("user") || entry.is_meta == Some(true) {
                 continue;
             }
@@ -346,12 +364,16 @@ impl Provider for ClaudeCodeProvider {
             return vec![self.root.clone()];
         };
         let normalized = normalize_path(project_path);
-        let Ok(dirs) = fs::read_dir(&self.root) else { return Vec::new() };
+        let Ok(dirs) = fs::read_dir(&self.root) else {
+            return Vec::new();
+        };
         dirs.filter_map(|e| e.ok())
             .map(|e| e.path())
             .filter(|dir| dir.is_dir())
             .filter(|dir| {
-                let Ok(files) = fs::read_dir(dir) else { return false };
+                let Ok(files) = fs::read_dir(dir) else {
+                    return false;
+                };
                 let first = files
                     .filter_map(|e| e.ok())
                     .map(|e| e.path())
@@ -367,10 +389,18 @@ impl Provider for ClaudeCodeProvider {
             .collect()
     }
 
-    fn resolve_hit(&self, file: &Path, _line_number: u64, line: &str, query: &str) -> Option<SearchHit> {
+    fn resolve_hit(
+        &self,
+        file: &Path,
+        _line_number: u64,
+        line: &str,
+        query: &str,
+    ) -> Option<SearchHit> {
         let entry = serde_json::from_str::<CcEntry>(line).ok()?;
-        if !matches!(entry.entry_type.as_deref(), Some("user") | Some("assistant"))
-            || entry.is_meta == Some(true)
+        if !matches!(
+            entry.entry_type.as_deref(),
+            Some("user") | Some("assistant")
+        ) || entry.is_meta == Some(true)
         {
             return None;
         }
@@ -401,7 +431,11 @@ impl Provider for ClaudeCodeProvider {
             .collect();
         let native_session_id = match components.iter().rposition(|&c| c == "subagents") {
             Some(index) if index > 0 => components[index - 1].to_string(),
-            _ => file.file_stem().unwrap_or_default().to_string_lossy().to_string(),
+            _ => file
+                .file_stem()
+                .unwrap_or_default()
+                .to_string_lossy()
+                .to_string(),
         };
         let cwd = entry
             .cwd
@@ -453,9 +487,12 @@ fn read_tail(file: &Path, limit: usize) -> Option<Vec<u8>> {
 fn collect_string_leaves(value: &Value, out: &mut Vec<String>) {
     match value {
         Value::String(text) => out.push(text.clone()),
-        Value::Array(items) => items.iter().for_each(|item| collect_string_leaves(item, out)),
-        Value::Object(object) => object.values().for_each(|item| collect_string_leaves(item, out)),
+        Value::Array(items) => items
+            .iter()
+            .for_each(|item| collect_string_leaves(item, out)),
+        Value::Object(object) => object
+            .values()
+            .for_each(|item| collect_string_leaves(item, out)),
         _ => {}
     }
 }
-

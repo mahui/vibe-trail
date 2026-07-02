@@ -63,7 +63,10 @@ pub struct GrepSearchEngine<'a> {
 
 impl<'a> GrepSearchEngine<'a> {
     pub fn new(providers: &'a [Box<dyn Provider>]) -> Self {
-        Self { providers, max_hits_per_file: 50 }
+        Self {
+            providers,
+            max_hits_per_file: 50,
+        }
     }
 }
 
@@ -79,7 +82,11 @@ impl SearchEngine for GrepSearchEngine<'_> {
             .map_err(|e| Error::Data(format!("Bad search pattern: {e}")))?;
         let mut hits = Vec::new();
         for provider in self.providers {
-            if scope.provider_id.as_deref().is_some_and(|id| id != provider.id()) {
+            if scope
+                .provider_id
+                .as_deref()
+                .is_some_and(|id| id != provider.id())
+            {
                 continue;
             }
             let files: Vec<PathBuf> = provider

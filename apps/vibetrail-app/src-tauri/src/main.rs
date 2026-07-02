@@ -1,4 +1,7 @@
-#![cfg_attr(all(not(debug_assertions), target_os = "windows"), windows_subsystem = "windows")]
+#![cfg_attr(
+    all(not(debug_assertions), target_os = "windows"),
+    windows_subsystem = "windows"
+)]
 
 mod config;
 mod resumer;
@@ -24,19 +27,26 @@ fn list_projects() -> Result<Vec<Project>, String> {
 
 #[tauri::command]
 fn list_sessions(project: String) -> Result<Vec<SessionSummary>, String> {
-    store().sessions(&project, None, None).map_err(|e| e.to_string())
+    store()
+        .sessions(&project, None, None)
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 fn get_session(session_id: String) -> Result<Session, String> {
     let store = store();
-    let (provider, raw) = store.resolve_session(&session_id).map_err(|e| e.to_string())?;
+    let (provider, raw) = store
+        .resolve_session(&session_id)
+        .map_err(|e| e.to_string())?;
     provider.parse(&raw).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 fn search(query: String, project: Option<String>) -> Result<Vec<SearchHit>, String> {
-    let scope = Scope { project_path: project, provider_id: None };
+    let scope = Scope {
+        project_path: project,
+        provider_id: None,
+    };
     search_store(&store(), &query, &scope).map_err(|e| e.to_string())
 }
 
@@ -47,7 +57,9 @@ fn can_resume(session_id: String) -> bool {
 
 #[tauri::command]
 fn resume_session(session_id: String) -> Result<Option<String>, String> {
-    let spec = store().resume_spec_for(&session_id).map_err(|e| e.to_string())?;
+    let spec = store()
+        .resume_spec_for(&session_id)
+        .map_err(|e| e.to_string())?;
     resumer::resume(&spec, config::load().terminal).map_err(|e| e.to_string())
 }
 

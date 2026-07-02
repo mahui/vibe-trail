@@ -22,7 +22,9 @@ pub struct AppConfig {
 }
 
 fn config_path() -> PathBuf {
-    dirs::home_dir().unwrap_or_default().join(".config/vibetrail/config.json")
+    dirs::home_dir()
+        .unwrap_or_default()
+        .join(".config/vibetrail/config.json")
 }
 
 pub fn load() -> AppConfig {

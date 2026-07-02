@@ -20,7 +20,12 @@ fn provider() -> AntigravityProvider {
 }
 
 fn raw() -> RawSession {
-    provider().discover().unwrap().into_iter().next().expect("fixture conversation present")
+    provider()
+        .discover()
+        .unwrap()
+        .into_iter()
+        .next()
+        .expect("fixture conversation present")
 }
 
 #[test]
@@ -57,7 +62,10 @@ fn artifacts_land_in_extensions() {
     assert_eq!(artifacts.len(), 2);
     assert_eq!(artifacts[0]["name"], "implementation_plan.md");
     assert_eq!(artifacts[1]["name"], "task.md");
-    assert_eq!(artifacts[1]["summary"], "Task list for fixing subtitle scroll jitter.");
+    assert_eq!(
+        artifacts[1]["summary"],
+        "Task list for fixing subtitle scroll jitter."
+    );
     assert_eq!(artifacts[1]["artifactType"], "ARTIFACT_TYPE_TASK");
 }
 
@@ -66,7 +74,10 @@ fn summary_and_quick_title() {
     let summary = provider().parse(&raw()).unwrap().summary;
     assert_eq!(summary.title, "Fix the subtitle auto-scroll jitter");
     assert_eq!(summary.message_count, 6);
-    assert_eq!(provider().quick_title(&raw()).as_deref(), Some("Fix the subtitle auto-scroll jitter"));
+    assert_eq!(
+        provider().quick_title(&raw()).as_deref(),
+        Some("Fix the subtitle auto-scroll jitter")
+    );
 }
 
 #[test]

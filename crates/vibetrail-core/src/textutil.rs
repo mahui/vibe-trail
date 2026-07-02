@@ -25,7 +25,9 @@ pub(crate) fn make_snippet(texts: &[String], query: &str) -> Option<String> {
     let query_lower = query.to_lowercase();
     for text in texts {
         let lower = text.to_lowercase();
-        let Some(byte_start) = lower.find(&query_lower) else { continue };
+        let Some(byte_start) = lower.find(&query_lower) else {
+            continue;
+        };
         // Counting chars on `lower` keeps the slice on a valid boundary even
         // when case-folding changed byte lengths.
         let chars: Vec<char> = text.chars().collect();

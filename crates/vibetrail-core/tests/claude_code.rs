@@ -38,7 +38,9 @@ fn discovers_top_level_sessions_only() {
     let sessions = provider().discover().unwrap();
     // Subagent files under <session>/subagents/ must not surface as sessions.
     assert_eq!(sessions.len(), 2);
-    assert!(sessions.iter().all(|s| s.project_path == "/Users/tester/demo-app"));
+    assert!(sessions
+        .iter()
+        .all(|s| s.project_path == "/Users/tester/demo-app"));
     assert!(sessions.iter().all(|s| s.provider_id == "claude-code"));
 }
 
@@ -66,7 +68,10 @@ fn regroups_streamed_assistant_message() {
 #[test]
 fn deduplicates_by_uuid() {
     let session = provider().parse(&raw(SESSION_1)).unwrap();
-    assert_eq!(session.messages.iter().filter(|m| m.uuid == "u1").count(), 1);
+    assert_eq!(
+        session.messages.iter().filter(|m| m.uuid == "u1").count(),
+        1
+    );
     assert_eq!(session.extensions["debug"]["duplicateUuids"], 1);
 }
 
@@ -92,7 +97,10 @@ fn reorders_out_of_order_tree() {
 #[test]
 fn filters_meta_and_sidechain_entries() {
     let session = provider().parse(&raw(SESSION_1)).unwrap();
-    assert!(!session.messages.iter().any(|m| m.uuid == "m1" || m.uuid == "s1"));
+    assert!(!session
+        .messages
+        .iter()
+        .any(|m| m.uuid == "m1" || m.uuid == "s1"));
     assert_eq!(session.extensions["debug"]["sidechainEntries"], 1);
 }
 
@@ -137,7 +145,10 @@ fn subagents_carry_message_previews() {
     let messages = subagents[0]["messages"].as_array().unwrap();
     assert_eq!(messages.len(), 2);
     assert_eq!(messages[0]["role"], "user");
-    assert_eq!(messages[0]["preview"], "Explore the codebase for login handlers");
+    assert_eq!(
+        messages[0]["preview"],
+        "Explore the codebase for login handlers"
+    );
 }
 
 #[test]
@@ -155,13 +166,19 @@ fn outline_matches_messages() {
     let stubs = provider().outline(&raw(SESSION_1)).unwrap();
     assert_eq!(stubs.len(), 4);
     assert_eq!(stubs[0].preview, "How do I fix the login bug?");
-    assert_eq!(stubs.iter().map(|s| s.index).collect::<Vec<_>>(), [0, 1, 2, 3]);
+    assert_eq!(
+        stubs.iter().map(|s| s.index).collect::<Vec<_>>(),
+        [0, 1, 2, 3]
+    );
 }
 
 #[test]
 fn page_slices() {
     let page = provider().page(&raw(SESSION_1), 1, 2).unwrap();
-    assert_eq!(page.iter().map(|m| m.uuid.as_str()).collect::<Vec<_>>(), ["a1y", "u2"]);
+    assert_eq!(
+        page.iter().map(|m| m.uuid.as_str()).collect::<Vec<_>>(),
+        ["a1y", "u2"]
+    );
     assert!(provider().page(&raw(SESSION_1), 10, 2).unwrap().is_empty());
 }
 
@@ -208,7 +225,9 @@ fn grep_search_resolves_message_uuids() {
     let store = store();
     let hits = search_store(&store, "certificate", &Scope::default()).unwrap();
     assert_eq!(hits.len(), 2);
-    assert!(hits.iter().all(|h| h.session_id == format!("claude-code:{SESSION_1}")));
+    assert!(hits
+        .iter()
+        .all(|h| h.session_id == format!("claude-code:{SESSION_1}")));
     let uuids: Vec<_> = hits.iter().map(|h| h.message_uuid.as_deref()).collect();
     assert_eq!(uuids, [Some("u2"), Some("a2")]);
     assert!(hits[0].snippet.to_lowercase().contains("certificate"));
@@ -217,6 +236,11 @@ fn grep_search_resolves_message_uuids() {
 #[test]
 fn search_scoped_to_unknown_project_returns_nothing() {
     let store = store();
-    let scope = Scope { project_path: Some("/nonexistent/elsewhere".into()), provider_id: None };
-    assert!(search_store(&store, "certificate", &scope).unwrap().is_empty());
+    let scope = Scope {
+        project_path: Some("/nonexistent/elsewhere".into()),
+        provider_id: None,
+    };
+    assert!(search_store(&store, "certificate", &scope)
+        .unwrap()
+        .is_empty());
 }

@@ -82,7 +82,10 @@ pub fn search(
     json: bool,
 ) -> Result<()> {
     let project_path = project.map(|p| store.resolve_project(p)).transpose()?;
-    let scope = Scope { project_path, provider_id: provider.map(String::from) };
+    let scope = Scope {
+        project_path,
+        provider_id: provider.map(String::from),
+    };
     let hits = search_store(store, query, &scope)?;
     if json {
         println!("{}", to_json(&hits)?);
@@ -178,19 +181,35 @@ fn print_extensions(session: &Session) {
         let get = |key: &str| usage.get(key).and_then(|v| v.as_u64()).unwrap_or(0);
         println!(
             "tokens: in {} · out {} · cache-read {} · cache-write {}",
-            get("inputTokens"), get("outputTokens"),
-            get("cacheReadTokens"), get("cacheCreationTokens"),
+            get("inputTokens"),
+            get("outputTokens"),
+            get("cacheReadTokens"),
+            get("cacheCreationTokens"),
         );
     }
-    if let Some(subagents) = session.extensions.get("subagents").and_then(|v| v.as_array()) {
+    if let Some(subagents) = session
+        .extensions
+        .get("subagents")
+        .and_then(|v| v.as_array())
+    {
         for agent in subagents {
-            let label = agent.get("description").or(agent.get("agentId"))
-                .and_then(|v| v.as_str()).unwrap_or("?");
-            let count = agent.get("messageCount").and_then(|v| v.as_u64()).unwrap_or(0);
+            let label = agent
+                .get("description")
+                .or(agent.get("agentId"))
+                .and_then(|v| v.as_str())
+                .unwrap_or("?");
+            let count = agent
+                .get("messageCount")
+                .and_then(|v| v.as_u64())
+                .unwrap_or(0);
             println!("subagent: {label} ({count} messages)");
         }
     }
-    if let Some(artifacts) = session.extensions.get("artifacts").and_then(|v| v.as_array()) {
+    if let Some(artifacts) = session
+        .extensions
+        .get("artifacts")
+        .and_then(|v| v.as_array())
+    {
         for artifact in artifacts {
             let name = artifact.get("name").and_then(|v| v.as_str()).unwrap_or("?");
             println!("artifact: {name}");
@@ -202,7 +221,10 @@ fn print_full(message: &Message) {
     println!(
         "{} [{}]",
         format::role_icon(message.role),
-        serde_json::to_value(message.role).unwrap().as_str().unwrap_or("?")
+        serde_json::to_value(message.role)
+            .unwrap()
+            .as_str()
+            .unwrap_or("?")
     );
     for block in &message.blocks {
         match block {
@@ -211,7 +233,10 @@ fn print_full(message: &Message) {
             ContentBlock::ToolResult { summary, truncated } => {
                 let first_line = summary.lines().next().unwrap_or("");
                 let ellipsis = if *truncated { " …" } else { "" };
-                println!("  → tool_result: {}{ellipsis}", format::truncate(first_line, 100));
+                println!(
+                    "  → tool_result: {}{ellipsis}",
+                    format::truncate(first_line, 100)
+                );
             }
             ContentBlock::Thinking { .. } => println!("  ✳ thinking (collapsed)"),
         }
@@ -232,7 +257,10 @@ pub fn resume(store: &SessionStore, session_id: &str) -> Result<()> {
         .current_dir(&spec.project_path)
         .exec();
     // Only reached when exec failed.
-    Err(Error::Data(format!("Failed to exec {}: {error}", spec.command.join(" "))))
+    Err(Error::Data(format!(
+        "Failed to exec {}: {error}",
+        spec.command.join(" ")
+    )))
 }
 
 pub fn open_gui(project: Option<&str>) -> Result<()> {

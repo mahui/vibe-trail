@@ -102,15 +102,30 @@ fn main() {
     };
     let result = match cli.command {
         Command::Projects { json } => commands::projects(&store(), json),
-        Command::Sessions { project, limit, provider, json } => {
-            commands::sessions(&store(), &project, limit, provider.as_deref(), json)
-        }
-        Command::Search { query, project, provider, json } => {
-            commands::search(&store(), &query, project.as_deref(), provider.as_deref(), json)
-        }
-        Command::Show { session_id, full, json, .. } => {
-            commands::show(&store(), &session_id, full, json)
-        }
+        Command::Sessions {
+            project,
+            limit,
+            provider,
+            json,
+        } => commands::sessions(&store(), &project, limit, provider.as_deref(), json),
+        Command::Search {
+            query,
+            project,
+            provider,
+            json,
+        } => commands::search(
+            &store(),
+            &query,
+            project.as_deref(),
+            provider.as_deref(),
+            json,
+        ),
+        Command::Show {
+            session_id,
+            full,
+            json,
+            ..
+        } => commands::show(&store(), &session_id, full, json),
         Command::Resume { session_id } => commands::resume(&store(), &session_id),
         Command::Open { project } => commands::open_gui(project.as_deref()),
     };

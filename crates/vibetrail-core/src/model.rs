@@ -72,10 +72,20 @@ pub enum Role {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum ContentBlock {
-    Text { text: String },
-    ToolUse { name: String, input: serde_json::Value },
-    ToolResult { summary: String, truncated: bool },
-    Thinking { text: String },
+    Text {
+        text: String,
+    },
+    ToolUse {
+        name: String,
+        input: serde_json::Value,
+    },
+    ToolResult {
+        summary: String,
+        truncated: bool,
+    },
+    Thinking {
+        text: String,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

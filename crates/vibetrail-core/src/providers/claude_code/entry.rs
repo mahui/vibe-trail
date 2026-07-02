@@ -54,5 +54,7 @@ pub struct CcSubagentMeta {
 
 /// ISO8601 with or without fractional seconds.
 pub fn parse_timestamp(value: Option<&str>) -> Option<DateTime<Utc>> {
-    DateTime::parse_from_rfc3339(value?).ok().map(|dt| dt.with_timezone(&Utc))
+    DateTime::parse_from_rfc3339(value?)
+        .ok()
+        .map(|dt| dt.with_timezone(&Utc))
 }

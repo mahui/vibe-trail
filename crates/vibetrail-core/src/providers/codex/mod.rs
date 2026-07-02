@@ -31,7 +31,10 @@ pub struct CodexProvider {
 impl CodexProvider {
     pub fn new(root: Option<PathBuf>) -> Self {
         let root = root.unwrap_or_else(|| {
-            dirs::home_dir().unwrap_or_default().join(".codex").join("sessions")
+            dirs::home_dir()
+                .unwrap_or_default()
+                .join(".codex")
+                .join("sessions")
         });
         Self { root }
     }
@@ -74,7 +77,9 @@ impl CodexProvider {
     }
 
     fn extract_meta(&self, path: &Path) -> (Option<String>, Option<String>) {
-        let Some(line) = self.read_first_line(path) else { return (None, None) };
+        let Some(line) = self.read_first_line(path) else {
+            return (None, None);
+        };
         let Ok(entry) = serde_json::from_slice::<RolloutLine>(&line) else {
             return (None, None);
         };
@@ -82,9 +87,14 @@ impl CodexProvider {
             return (None, None);
         }
         let payload = entry.payload.unwrap_or(Value::Null);
-        let cwd = payload.get("cwd").and_then(Value::as_str).map(str::to_string);
-        let branch =
-            payload.pointer("/git/branch").and_then(Value::as_str).map(str::to_string);
+        let cwd = payload
+            .get("cwd")
+            .and_then(Value::as_str)
+            .map(str::to_string);
+        let branch = payload
+            .pointer("/git/branch")
+            .and_then(Value::as_str)
+            .map(str::to_string);
         (cwd, branch)
     }
 
@@ -138,8 +148,13 @@ impl CodexProvider {
         match message.blocks.first() {
             Some(ContentBlock::ToolUse { name, .. }) => format!("⚙ {name}"),
             Some(ContentBlock::ToolResult { summary, .. }) => {
-                let line: String =
-                    summary.lines().next().unwrap_or("").chars().take(100).collect();
+                let line: String = summary
+                    .lines()
+                    .next()
+                    .unwrap_or("")
+                    .chars()
+                    .take(100)
+                    .collect();
                 format!("→ {line}")
             }
             Some(ContentBlock::Thinking { .. }) => "(thinking)".to_string(),
@@ -285,7 +300,11 @@ impl Provider for CodexProvider {
             {
                 continue;
             }
-            for item in payload.get("content").and_then(Value::as_array).unwrap_or(&Vec::new()) {
+            for item in payload
+                .get("content")
+                .and_then(Value::as_array)
+                .unwrap_or(&Vec::new())
+            {
                 if let Some(text) = item.get("text").and_then(Value::as_str) {
                     if !text.trim().is_empty() && !pipeline::is_context_payload(text) {
                         return Some(sanitize_title(text));
@@ -321,8 +340,12 @@ impl Provider for CodexProvider {
             if !is_zst(&file) {
                 continue;
             }
-            let Ok(data) = self.read_all(&file) else { continue };
-            let Ok(text) = String::from_utf8(data) else { continue };
+            let Ok(data) = self.read_all(&file) else {
+                continue;
+            };
+            let Ok(text) = String::from_utf8(data) else {
+                continue;
+            };
             let mut per_file = 0;
             for (index, line) in text.lines().enumerate() {
                 if per_file >= 50 {
@@ -346,7 +369,9 @@ fn is_zst(path: &Path) -> bool {
 }
 
 fn is_rollout_file(path: &Path) -> bool {
-    let Some(name) = path.file_name().and_then(|n| n.to_str()) else { return false };
+    let Some(name) = path.file_name().and_then(|n| n.to_str()) else {
+        return false;
+    };
     name.starts_with("rollout-") && (name.ends_with(".jsonl") || name.ends_with(".jsonl.zst"))
 }
 

@@ -59,7 +59,9 @@ struct AgyParseResult {
 impl AntigravityProvider {
     pub fn new(root: Option<PathBuf>) -> Self {
         let root = root.unwrap_or_else(|| {
-            dirs::home_dir().unwrap_or_default().join(".gemini/antigravity/brain")
+            dirs::home_dir()
+                .unwrap_or_default()
+                .join(".gemini/antigravity/brain")
         });
         Self { root }
     }
@@ -99,7 +101,9 @@ impl AntigravityProvider {
                 }
                 Some("PLANNER_RESPONSE") => Some((
                     Role::Assistant,
-                    vec![ContentBlock::Text { text: content.to_string() }],
+                    vec![ContentBlock::Text {
+                        text: content.to_string(),
+                    }],
                 )),
                 Some(
                     tool @ ("VIEW_FILE" | "GREP_SEARCH" | "RUN_COMMAND" | "CODE_ACTION"
@@ -109,7 +113,10 @@ impl AntigravityProvider {
                     Some((
                         Role::Assistant,
                         vec![
-                            ContentBlock::ToolUse { name: tool.to_lowercase(), input: Value::Null },
+                            ContentBlock::ToolUse {
+                                name: tool.to_lowercase(),
+                                input: Value::Null,
+                            },
                             ContentBlock::ToolResult {
                                 summary,
                                 truncated: content.chars().count() > 200,
@@ -124,7 +131,9 @@ impl AntigravityProvider {
                 }
             };
             if let Some((role, blocks)) = message {
-                if blocks.iter().any(|b| !matches!(b, ContentBlock::Text { text } if text.is_empty()))
+                if blocks
+                    .iter()
+                    .any(|b| !matches!(b, ContentBlock::Text { text } if text.is_empty()))
                 {
                     result.messages.push(Message {
                         uuid,
@@ -148,7 +157,9 @@ impl AntigravityProvider {
     /// Markdown artifacts (plan/task/walkthrough) beside the transcript →
     /// extensions. This is the provider's differentiator (has_artifacts).
     fn collect_artifacts(&self, conversation_dir: &Path) -> Vec<Value> {
-        let Ok(entries) = fs::read_dir(conversation_dir) else { return Vec::new() };
+        let Ok(entries) = fs::read_dir(conversation_dir) else {
+            return Vec::new();
+        };
         let mut files: Vec<PathBuf> = entries
             .filter_map(|e| e.ok())
             .map(|e| e.path())
@@ -166,8 +177,10 @@ impl AntigravityProvider {
                     "name": file.file_name().unwrap_or_default().to_string_lossy(),
                     "path": file.to_string_lossy(),
                 });
-                let meta_path =
-                    file.with_file_name(format!("{}.metadata.json", file.file_name().unwrap_or_default().to_string_lossy()));
+                let meta_path = file.with_file_name(format!(
+                    "{}.metadata.json",
+                    file.file_name().unwrap_or_default().to_string_lossy()
+                ));
                 if let Ok(meta) = fs::read(&meta_path) {
                     if let Ok(value) = serde_json::from_slice::<Value>(&meta) {
                         if let Some(summary) = value.get("summary") {
@@ -214,9 +227,13 @@ impl AntigravityProvider {
 
     fn preview(&self, message: &Message) -> String {
         match message.blocks.first() {
-            Some(ContentBlock::Text { text }) => {
-                text.lines().next().unwrap_or("").chars().take(120).collect()
-            }
+            Some(ContentBlock::Text { text }) => text
+                .lines()
+                .next()
+                .unwrap_or("")
+                .chars()
+                .take(120)
+                .collect(),
             Some(ContentBlock::ToolUse { name, .. }) => format!("⚙ {name}"),
             Some(ContentBlock::ToolResult { summary, .. }) => {
                 format!("→ {}", summary.lines().next().unwrap_or(""))
@@ -252,7 +269,9 @@ impl Provider for AntigravityProvider {
                 continue;
             }
             let transcript = self.transcript_path(&dir);
-            let Ok(metadata) = fs::metadata(&transcript) else { continue };
+            let Ok(metadata) = fs::metadata(&transcript) else {
+                continue;
+            };
             // Project derivation needs the file paths the agent touched;
             // transcripts are small, so a bounded scan stays cheap.
             let head = read_head(&transcript, BOUNDED_READ).unwrap_or_default();
@@ -262,8 +281,8 @@ impl Provider for AntigravityProvider {
                     collect_file_paths(step.content.as_deref().unwrap_or(""), &mut touched);
                 }
             }
-            let project_path = derive_project(&touched)
-                .unwrap_or_else(|| "(antigravity)".to_string());
+            let project_path =
+                derive_project(&touched).unwrap_or_else(|| "(antigravity)".to_string());
             sessions.push(RawSession {
                 provider_id: PROVIDER_ID.to_string(),
                 native_id: entry.file_name().to_string_lossy().to_string(),
@@ -343,7 +362,9 @@ impl Provider for AntigravityProvider {
     fn quick_title(&self, raw: &RawSession) -> Option<String> {
         let head = read_head(&raw.file_path, BOUNDED_READ)?;
         for line in head.split(|&b| b == b'\n') {
-            let Ok(step) = serde_json::from_slice::<AgyStep>(line) else { continue };
+            let Ok(step) = serde_json::from_slice::<AgyStep>(line) else {
+                continue;
+            };
             if step.step_type.as_deref() == Some("USER_INPUT") {
                 let text = extract_user_request(step.content.as_deref().unwrap_or(""));
                 if !text.is_empty() {
@@ -370,7 +391,9 @@ impl Provider for AntigravityProvider {
         let step = serde_json::from_str::<AgyStep>(line).ok()?;
         if !matches!(
             step.step_type.as_deref(),
-            Some("USER_INPUT") | Some("PLANNER_RESPONSE") | Some("RUN_COMMAND")
+            Some("USER_INPUT")
+                | Some("PLANNER_RESPONSE")
+                | Some("RUN_COMMAND")
                 | Some("CODE_ACTION")
         ) {
             return None;
@@ -432,7 +455,11 @@ fn derive_project(paths: &[PathBuf]) -> Option<String> {
     let mut common: Vec<std::path::Component> = first.components().collect();
     for dir in &dirs[1..] {
         let components: Vec<std::path::Component> = dir.components().collect();
-        let shared = common.iter().zip(&components).take_while(|(a, b)| a == b).count();
+        let shared = common
+            .iter()
+            .zip(&components)
+            .take_while(|(a, b)| a == b)
+            .count();
         common.truncate(shared);
     }
     if common.len() <= 1 {

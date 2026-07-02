@@ -42,18 +42,27 @@ fn parses_whitelisted_response_items_only() {
     let session = provider().parse(&raw()).unwrap();
     // user prompt, reasoning, function_call, function_call_output, assistant.
     assert_eq!(session.messages.len(), 5);
-    let kinds: Vec<(&Role, usize)> =
-        session.messages.iter().map(|m| (&m.role, m.blocks.len())).collect();
+    let kinds: Vec<(&Role, usize)> = session
+        .messages
+        .iter()
+        .map(|m| (&m.role, m.blocks.len()))
+        .collect();
     assert_eq!(kinds.len(), 5);
-    assert!(matches!(&session.messages[0].blocks[0], ContentBlock::Text { text } if text == "Add a retry to the flaky upload"));
-    assert!(matches!(&session.messages[1].blocks[0], ContentBlock::Thinking { text } if text == "Look at the uploader first."));
+    assert!(
+        matches!(&session.messages[0].blocks[0], ContentBlock::Text { text } if text == "Add a retry to the flaky upload")
+    );
+    assert!(
+        matches!(&session.messages[1].blocks[0], ContentBlock::Thinking { text } if text == "Look at the uploader first.")
+    );
     let ContentBlock::ToolUse { name, input } = &session.messages[2].blocks[0] else {
         panic!("expected tool_use");
     };
     assert_eq!(name, "exec_command");
     // JSON-encoded argument strings are decoded for display.
     assert_eq!(input["cmd"], "ls src");
-    assert!(matches!(&session.messages[3].blocks[0], ContentBlock::ToolResult { summary, truncated: false } if summary == "upload.rs\nmain.rs"));
+    assert!(
+        matches!(&session.messages[3].blocks[0], ContentBlock::ToolResult { summary, truncated: false } if summary == "upload.rs\nmain.rs")
+    );
     assert_eq!(session.messages[4].role, Role::Assistant);
 }
 
@@ -124,10 +133,11 @@ fn zst_sessions_discover_parse_and_search() {
     let dir = tempfile::tempdir().unwrap();
     let day_dir = dir.path().join("2026/06/11");
     fs::create_dir_all(&day_dir).unwrap();
-    let plain = fs::read(
-        fixture_root().join("2026/06/10/rollout-2026-06-10T12-00-00-aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee.jsonl"),
-    )
-    .unwrap();
+    let plain =
+        fs::read(fixture_root().join(
+            "2026/06/10/rollout-2026-06-10T12-00-00-aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee.jsonl",
+        ))
+        .unwrap();
     let compressed = zstd::encode_all(plain.as_slice(), 3).unwrap();
     fs::write(
         day_dir.join("rollout-2026-06-11T09-00-00-bbbbbbbb-cccc-dddd-eeee-ffffffffffff.jsonl.zst"),
@@ -138,7 +148,10 @@ fn zst_sessions_discover_parse_and_search() {
     let provider = CodexProvider::new(Some(dir.path().to_path_buf()));
     let sessions = provider.discover().unwrap();
     assert_eq!(sessions.len(), 1);
-    assert_eq!(sessions[0].native_id, "bbbbbbbb-cccc-dddd-eeee-ffffffffffff");
+    assert_eq!(
+        sessions[0].native_id,
+        "bbbbbbbb-cccc-dddd-eeee-ffffffffffff"
+    );
     assert_eq!(sessions[0].project_path, "/Users/tester/demo-app");
 
     let session = provider.parse(&sessions[0]).unwrap();
@@ -147,7 +160,10 @@ fn zst_sessions_discover_parse_and_search() {
     let store = SessionStore::new(vec![Box::new(provider)]);
     let hits = search_store(&store, "exponential backoff", &Scope::default()).unwrap();
     assert_eq!(hits.len(), 1);
-    assert_eq!(hits[0].session_id, "codex:bbbbbbbb-cccc-dddd-eeee-ffffffffffff");
+    assert_eq!(
+        hits[0].session_id,
+        "codex:bbbbbbbb-cccc-dddd-eeee-ffffffffffff"
+    );
     assert_eq!(hits[0].message_uuid.as_deref(), Some("L8"));
 }
 
@@ -167,11 +183,15 @@ fn cross_provider_project_aggregation() {
     assert!(project.providers.contains("claude-code"));
     assert!(project.providers.contains("codex"));
 
-    let sessions = store.sessions("/Users/tester/demo-app", None, None).unwrap();
+    let sessions = store
+        .sessions("/Users/tester/demo-app", None, None)
+        .unwrap();
     assert_eq!(sessions.len(), 3);
 
     // Provider-scoped listing still works.
-    let codex_only = store.sessions("/Users/tester/demo-app", Some("codex"), None).unwrap();
+    let codex_only = store
+        .sessions("/Users/tester/demo-app", Some("codex"), None)
+        .unwrap();
     assert_eq!(codex_only.len(), 1);
     assert_eq!(codex_only[0].provider_id, "codex");
 }

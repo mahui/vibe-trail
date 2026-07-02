@@ -14,7 +14,11 @@ pub fn resume(spec: &ResumeSpec, terminal: TerminalKind) -> Result<Option<String
     let shell_command = format!(
         "cd {} && {}",
         shell_quote(&spec.project_path),
-        spec.command.iter().map(|arg| shell_quote(arg)).collect::<Vec<_>>().join(" ")
+        spec.command
+            .iter()
+            .map(|arg| shell_quote(arg))
+            .collect::<Vec<_>>()
+            .join(" ")
     );
     match terminal {
         TerminalKind::Terminal => {
@@ -39,7 +43,9 @@ pub fn resume(spec: &ResumeSpec, terminal: TerminalKind) -> Result<Option<String
                 .status()
                 .map_err(|e| Error::Data(format!("Failed to launch Ghostty: {e}")))?;
             if !status.success() {
-                return Err(Error::Data("Ghostty launch failed; is it installed?".to_string()));
+                return Err(Error::Data(
+                    "Ghostty launch failed; is it installed?".to_string(),
+                ));
             }
             Ok(None)
         }
@@ -48,13 +54,18 @@ pub fn resume(spec: &ResumeSpec, terminal: TerminalKind) -> Result<Option<String
                 "set the clipboard to \"{}\"",
                 applescript_escape(&shell_command)
             ))?;
-            let url = format!("warp://action/new_window?path={}", url_encode(&spec.project_path));
+            let url = format!(
+                "warp://action/new_window?path={}",
+                url_encode(&spec.project_path)
+            );
             let status = Command::new("/usr/bin/open")
                 .arg(&url)
                 .status()
                 .map_err(|e| Error::Data(format!("Failed to launch Warp: {e}")))?;
             if !status.success() {
-                return Err(Error::Data("Warp launch failed; is it installed?".to_string()));
+                return Err(Error::Data(
+                    "Warp launch failed; is it installed?".to_string(),
+                ));
             }
             Ok(Some(
                 "Warp opened at the project; the resume command is on your clipboard — paste to run."
