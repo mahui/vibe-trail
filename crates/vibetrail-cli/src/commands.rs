@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::os::unix::process::CommandExt;
 
 use vibetrail_core::{
-    search_store, ContentBlock, Error, Message, Result, Scope, SearchHit, SessionStore,
+    search_store, ContentBlock, Error, Message, Result, Scope, SearchHit, Session, SessionStore,
     SessionSummary,
 };
 
@@ -132,6 +132,7 @@ pub fn show(store: &SessionStore, session_id: &str, full: bool, json: bool) -> R
             return Ok(());
         }
         print_header(&session.summary);
+        print_extensions(&session);
         for message in &session.messages {
             print_full(message);
         }
@@ -168,6 +169,33 @@ fn print_header(summary: &SessionSummary) {
     }
     println!("{meta}");
     println!("{}", "─".repeat(80));
+}
+
+/// P1 extras carried in provider extensions: token totals, subagents,
+/// artifacts.
+fn print_extensions(session: &Session) {
+    if let Some(usage) = session.extensions.get("usage") {
+        let get = |key: &str| usage.get(key).and_then(|v| v.as_u64()).unwrap_or(0);
+        println!(
+            "tokens: in {} · out {} · cache-read {} · cache-write {}",
+            get("inputTokens"), get("outputTokens"),
+            get("cacheReadTokens"), get("cacheCreationTokens"),
+        );
+    }
+    if let Some(subagents) = session.extensions.get("subagents").and_then(|v| v.as_array()) {
+        for agent in subagents {
+            let label = agent.get("description").or(agent.get("agentId"))
+                .and_then(|v| v.as_str()).unwrap_or("?");
+            let count = agent.get("messageCount").and_then(|v| v.as_u64()).unwrap_or(0);
+            println!("subagent: {label} ({count} messages)");
+        }
+    }
+    if let Some(artifacts) = session.extensions.get("artifacts").and_then(|v| v.as_array()) {
+        for artifact in artifacts {
+            let name = artifact.get("name").and_then(|v| v.as_str()).unwrap_or("?");
+            println!("artifact: {name}");
+        }
+    }
 }
 
 fn print_full(message: &Message) {

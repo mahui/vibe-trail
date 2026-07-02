@@ -22,6 +22,15 @@ pub struct CcEntry {
     pub last_prompt: Option<String>,
 }
 
+#[derive(Debug, Default, Clone, Copy, Deserialize)]
+#[serde(default)]
+pub struct CcUsage {
+    pub input_tokens: Option<u64>,
+    pub output_tokens: Option<u64>,
+    pub cache_creation_input_tokens: Option<u64>,
+    pub cache_read_input_tokens: Option<u64>,
+}
+
 #[derive(Debug, Default, Deserialize)]
 #[serde(default)]
 pub struct CcMessage {
@@ -32,6 +41,7 @@ pub struct CcMessage {
     /// Either a plain string (typed user prompt) or an array of content
     /// blocks; kept as raw JSON and interpreted tolerantly downstream.
     pub content: Option<serde_json::Value>,
+    pub usage: Option<CcUsage>,
 }
 
 /// `subagents/agent-<id>.meta.json`.

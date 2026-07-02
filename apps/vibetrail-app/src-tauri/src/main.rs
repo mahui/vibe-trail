@@ -1,9 +1,10 @@
 #![cfg_attr(all(not(debug_assertions), target_os = "windows"), windows_subsystem = "windows")]
 
+mod config;
 mod resumer;
 
 use vibetrail_core::{
-    search_store, AntigravityProvider, ClaudeCodeProvider, CodexProvider, Project, Resumer, Scope,
+    search_store, AntigravityProvider, ClaudeCodeProvider, CodexProvider, Project, Scope,
     SearchHit, Session, SessionStore, SessionSummary,
 };
 
@@ -45,9 +46,19 @@ fn can_resume(session_id: String) -> bool {
 }
 
 #[tauri::command]
-fn resume_session(session_id: String) -> Result<(), String> {
+fn resume_session(session_id: String) -> Result<Option<String>, String> {
     let spec = store().resume_spec_for(&session_id).map_err(|e| e.to_string())?;
-    resumer::TerminalResumer.resume(&spec).map_err(|e| e.to_string())
+    resumer::resume(&spec, config::load().terminal).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn get_config() -> config::AppConfig {
+    config::load()
+}
+
+#[tauri::command]
+fn set_config(config: config::AppConfig) -> Result<(), String> {
+    config::save(&config)
 }
 
 fn main() {
@@ -59,6 +70,8 @@ fn main() {
             search,
             can_resume,
             resume_session,
+            get_config,
+            set_config,
         ])
         .run(tauri::generate_context!())
         .expect("error while running VibeTrail");

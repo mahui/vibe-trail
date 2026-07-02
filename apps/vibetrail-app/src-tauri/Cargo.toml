@@ -14,3 +14,4 @@ vibetrail-core = { path = "../../../crates/vibetrail-core" }
 serde.workspace = true
 serde_json.workspace = true
 tauri = { version = "2", features = [] }
+dirs = "6"

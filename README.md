@@ -28,11 +28,11 @@ closes the loop: **browse → search → resume**.
 
 ## Status
 
-| Provider | Version | Capabilities |
-|----------|---------|--------------|
-| Claude Code | v1 (current) | browse / search / resume |
-| Codex | v1.1 (planned) | file-based reading incl. `.zst` |
-| Antigravity | v1.2 (planned, experimental) | partial, read-only |
+| Provider | Status | Capabilities |
+|----------|--------|--------------|
+| Claude Code | ✅ | browse / search / resume, subagent view, token stats |
+| Codex | ✅ | browse / search / resume, incl. `.jsonl.zst` |
+| Antigravity | ✅ experimental | browse / search / artifacts (no resume) |
 
 ## Requirements
 
@@ -68,6 +68,14 @@ Every query command accepts `--json`. Session ids accept any unique prefix.
 
 Exit codes: `0` success · `1` usage error · `2` data error · `3` resume
 precondition failed · `4` operation unsupported by provider.
+
+## Configuration
+
+The GUI's Resume button can target Terminal.app (default), iTerm2, Ghostty, or
+Warp — pick one in the sidebar selector (stored in
+`~/.config/vibetrail/config.json`). Warp cannot be scripted to run a command,
+so VibeTrail opens the project there and puts the resume command on your
+clipboard.
 
 ## Safety
 

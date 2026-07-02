@@ -5,7 +5,7 @@ use serde_json::Value;
 
 use crate::model::{ContentBlock, Message, Role};
 
-use super::entry::{parse_timestamp, CcEntry};
+use super::entry::{parse_timestamp, CcEntry, CcUsage};
 
 /// Parse statistics. Unknown input is never fatal (rule 3); it is counted
 /// here and surfaced through `Session.extensions["debug"]`.
@@ -20,9 +20,36 @@ pub struct CcParseStats {
     pub empty_messages: u64,
 }
 
+/// Rule 2: usage is accumulated over deduplicated logical messages only —
+/// per streamed message the last chunk's usage (the final API totals) wins.
+#[derive(Debug, Default, Clone, Copy)]
+pub struct CcUsageTotals {
+    pub input_tokens: u64,
+    pub output_tokens: u64,
+    pub cache_creation_tokens: u64,
+    pub cache_read_tokens: u64,
+}
+
+impl CcUsageTotals {
+    pub fn is_zero(&self) -> bool {
+        self.input_tokens == 0
+            && self.output_tokens == 0
+            && self.cache_creation_tokens == 0
+            && self.cache_read_tokens == 0
+    }
+
+    fn add(&mut self, usage: &CcUsage) {
+        self.input_tokens += usage.input_tokens.unwrap_or(0);
+        self.output_tokens += usage.output_tokens.unwrap_or(0);
+        self.cache_creation_tokens += usage.cache_creation_input_tokens.unwrap_or(0);
+        self.cache_read_tokens += usage.cache_read_input_tokens.unwrap_or(0);
+    }
+}
+
 #[derive(Debug, Default)]
 pub struct CcParseResult {
     pub messages: Vec<Message>,
+    pub usage: CcUsageTotals,
     pub ai_title: Option<String>,
     pub last_prompt: Option<String>,
     pub git_branch: Option<String>,
@@ -39,6 +66,11 @@ pub fn run(data: &[u8], include_sidechain: bool) -> CcParseResult {
     let kept = classify_and_filter(entries, include_sidechain, &mut result);
     let logical = regroup_by_message_id(kept);
     let ordered = tree_order(logical);
+    for message in &ordered {
+        if let Some(usage) = &message.usage {
+            result.usage.add(usage);
+        }
+    }
     result.messages = transform(ordered, &mut result.stats);
     result.first_user_prompt = first_user_prompt(&result.messages);
     result
@@ -115,6 +147,7 @@ pub struct LogicalMessage {
     timestamp: DateTime<Utc>,
     blocks: Vec<Value>,
     plain_text: Option<String>,
+    usage: Option<CcUsage>,
 }
 
 fn regroup_by_message_id(entries: Vec<CcEntry>) -> Vec<LogicalMessage> {
@@ -138,10 +171,14 @@ fn regroup_by_message_id(entries: Vec<CcEntry>) -> Vec<LogicalMessage> {
             if let Some(api_id) = &api_id {
                 if let Some(&index) = index_by_api_id.get(api_id) {
                     // Continuation chunk of a streamed message: merge blocks,
-                    // advance the node uuid to the newest chunk.
+                    // advance the node uuid to the newest chunk, keep the
+                    // newest usage (final API totals).
                     messages[index].blocks.append(&mut blocks);
                     if let Some(uuid) = entry.uuid {
                         messages[index].uuid = uuid;
+                    }
+                    if let Some(usage) = entry.message.as_ref().and_then(|m| m.usage) {
+                        messages[index].usage = Some(usage);
                     }
                     continue;
                 }
@@ -153,6 +190,7 @@ fn regroup_by_message_id(entries: Vec<CcEntry>) -> Vec<LogicalMessage> {
             role,
             timestamp: parse_timestamp(entry.timestamp.as_deref())
                 .unwrap_or(DateTime::<Utc>::UNIX_EPOCH),
+            usage: entry.message.as_ref().and_then(|m| m.usage),
             blocks,
             plain_text,
         };

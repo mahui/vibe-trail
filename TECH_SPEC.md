@@ -53,8 +53,8 @@ vibetrail/                        # Cargo workspace
 
 **状态:** 已接受
 **CLI:** 校验路径后 `chdir` 到项目路径并 `exec` provider 给出的 resume 命令(Unix `CommandExt::exec`)。
-**GUI:** Tauri 后端(Rust)经 `osascript` 拉起用户配置的终端执行同命令。v1 支持一种终端,终端适配层为 trait,后续扩展。
-**安全:** 无网络监听面;AppleScript 需 Automation 权限,首次触发引导授权。
+**GUI:** Tauri 后端(Rust)按用户配置的终端拉起执行(P1 已交付,配置在 `~/.config/vibetrail/config.json`):Terminal.app / iTerm2 经 `osascript` 直接执行;Ghostty 经 `open -na Ghostty --args --working-directory … -e`;Warp 无可脚本化的"执行命令"面,降级为打开项目目录 + resume 命令入剪贴板并提示用户粘贴。
+**安全:** 无网络监听面;AppleScript 需 Automation 权限,首次触发引导授权。config.json 是 VibeTrail 唯一写入的文件,agent 存储目录仍严格只读。
 
 ### ADR-5:License 与开源结构
 
@@ -213,13 +213,13 @@ tool call / result / thinking 折叠为单行摘要,点击展开;超长 tool res
 
 ## 10. 里程碑
 
-| 阶段 | 交付 | 验收 |
-|------|------|------|
-| M1 | Core 统一模型 + Provider 协议 + CC provider 解析,CLI `projects/sessions/show` | 本机 `~/.claude` 对拍全部正确 |
-| M2 | CLI `search/resume`,`--json` 全覆盖 | CLI 完整可用,自用替代 `/resume` |
-| M3 | GUI 三视图 + 搜索 + Resume | PRD P0 闭环,开源发布 v1 |
-| M4 | Codex provider | 抽象验证通过(无需改协议或改动极小),发布 v1.1 |
-| M5 | Antigravity provider(experimental)、P1 项 | v1.2 |
+| 阶段 | 交付 | 验收 | 状态 |
+|------|------|------|------|
+| M1 | Core 统一模型 + Provider 协议 + CC provider 解析,CLI `projects/sessions/show` | 本机 `~/.claude` 对拍全部正确 | ✅ |
+| M2 | CLI `search/resume`,`--json` 全覆盖 | CLI 完整可用,自用替代 `/resume` | ✅ |
+| M3 | GUI 三视图 + 搜索 + Resume | PRD P0 闭环,开源发布 v1 | ✅ |
+| M4 | Codex provider | 抽象验证通过(无需改协议或改动极小),发布 v1.1 | ✅(trait 增加 line_number/search_compressed 两处,详见 §3) |
+| M5 | Antigravity provider(experimental)、P1 项 | v1.2 | ✅(P1 token 统计不含 cost 换算——定价表随模型漂移,只做 token) |
 
 M1/M2 先行:CLI 是 Core 的测试驱动器,GUI 只是换皮。
 

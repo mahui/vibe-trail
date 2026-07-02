@@ -113,9 +113,21 @@ impl ClaudeCodeProvider {
             let Ok(data) = fs::read(&file) else { continue };
             // Subagent transcripts are sidechains by definition.
             let result = pipeline::run(&data, true);
+            let previews: Vec<Value> = result
+                .messages
+                .iter()
+                .take(100)
+                .map(|message| {
+                    json!({
+                        "role": message.role,
+                        "preview": self.preview(message),
+                    })
+                })
+                .collect();
             let mut object = json!({
                 "agentId": file.file_stem().unwrap_or_default().to_string_lossy(),
                 "messageCount": result.messages.len(),
+                "messages": previews,
             });
             let meta_path = file.with_extension("meta.json");
             if let Ok(meta_data) = fs::read(&meta_path) {
@@ -235,6 +247,17 @@ impl Provider for ClaudeCodeProvider {
         let subagents = self.parse_subagents(raw);
         if !subagents.is_empty() {
             extensions.insert("subagents".to_string(), Value::Array(subagents));
+        }
+        if !result.usage.is_zero() {
+            extensions.insert(
+                "usage".to_string(),
+                json!({
+                    "inputTokens": result.usage.input_tokens,
+                    "outputTokens": result.usage.output_tokens,
+                    "cacheCreationTokens": result.usage.cache_creation_tokens,
+                    "cacheReadTokens": result.usage.cache_read_tokens,
+                }),
+            );
         }
         extensions.insert("debug".to_string(), self.debug_extension(&result.stats));
         Ok(Session {

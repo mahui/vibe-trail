@@ -13,6 +13,7 @@ const el = {
   title: document.getElementById("detail-title"),
   resume: document.getElementById("resume-btn"),
   toast: document.getElementById("toast"),
+  terminal: document.getElementById("terminal-select"),
 };
 
 const state = {
@@ -39,6 +40,13 @@ function relativeTime(iso) {
   return new Date(iso).toISOString().slice(0, 10);
 }
 
+function compact(n) {
+  if (!n) return "0";
+  if (n >= 1e6) return (n / 1e6).toFixed(1) + "M";
+  if (n >= 1e3) return (n / 1e3).toFixed(1) + "k";
+  return String(n);
+}
+
 function providerLabel(id) {
   return id === "antigravity" ? "antigravity (exp)" : id;
 }
@@ -49,11 +57,12 @@ function shortPath(path) {
 }
 
 let toastTimer;
-function toast(message) {
+function toast(message, info = false) {
   el.toast.textContent = message;
+  el.toast.classList.toggle("info", info);
   el.toast.classList.remove("hidden");
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => el.toast.classList.add("hidden"), 5000);
+  toastTimer = setTimeout(() => el.toast.classList.add("hidden"), 6000);
 }
 
 async function call(command, args) {
@@ -150,10 +159,15 @@ async function loadDetail(sessionId) {
   const session = await call("get_session", { sessionId });
   const summary = session.summary;
   el.title.classList.remove("placeholder");
+  let sub = `${summary.projectPath} · ${summary.messageCount} messages`;
+  const usage = session.extensions && session.extensions.usage;
+  if (usage) {
+    sub += ` · tokens ↑${compact(usage.inputTokens + usage.cacheCreationTokens + usage.cacheReadTokens)} ↓${compact(usage.outputTokens)}`;
+  }
   el.title.replaceChildren(
     text("span", "", summary.title),
     document.createElement("br"),
-    text("span", "sub", `${summary.projectPath} · ${summary.messageCount} messages`),
+    text("span", "sub", sub),
   );
   el.timeline.replaceChildren();
   const artifacts = session.extensions && session.extensions.artifacts;
@@ -168,6 +182,24 @@ async function loadDetail(sessionId) {
     }
     el.timeline.append(box);
   }
+  const subagents = session.extensions && session.extensions.subagents;
+  if (Array.isArray(subagents) && subagents.length > 0) {
+    const box = text("div", "artifacts");
+    box.append(text("div", "artifacts-title", `Subagents (${subagents.length})`));
+    for (const agent of subagents) {
+      const details = text("details", "block tool subagent");
+      const label = [agent.agentType, agent.description].filter(Boolean).join(" · ")
+        || agent.agentId;
+      details.append(text("summary", "", `⑂ ${label} (${agent.messageCount} messages)`));
+      const body = text("div", "subagent-messages");
+      for (const m of agent.messages || []) {
+        body.append(text("div", "subagent-line", `${m.role === "user" ? "❯" : "●"} ${m.preview}`));
+      }
+      details.append(body);
+      box.append(details);
+    }
+    el.timeline.append(box);
+  }
   for (const message of session.messages) {
     const row = text("div", `message ${message.role}`);
     row.dataset.uuid = message.uuid;
@@ -179,7 +211,10 @@ async function loadDetail(sessionId) {
   }
   const resumable = await call("can_resume", { sessionId });
   el.resume.classList.toggle("hidden", !resumable);
-  el.resume.onclick = () => call("resume_session", { sessionId });
+  el.resume.onclick = async () => {
+    const note = await call("resume_session", { sessionId });
+    if (note) toast(note, true);
+  };
   if (state.scrollTarget) {
     const target = el.timeline.querySelector(`[data-uuid="${CSS.escape(state.scrollTarget)}"]`);
     if (target) {
@@ -253,4 +288,15 @@ el.search.addEventListener("keydown", (event) => {
   }
 });
 
+async function initConfig() {
+  try {
+    const config = await invoke("get_config");
+    el.terminal.value = config.terminal;
+  } catch (_) { /* config is optional */ }
+  el.terminal.addEventListener("change", () => {
+    call("set_config", { config: { terminal: el.terminal.value } });
+  });
+}
+
+initConfig();
 loadProjects();

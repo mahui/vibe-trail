@@ -9,7 +9,15 @@
 <body>
   <div id="app">
     <aside id="sidebar">
-      <header class="pane-header">Projects</header>
+      <header class="pane-header">
+        <span style="flex:1">Projects</span>
+        <select id="terminal-select" title="Terminal used by Resume">
+          <option value="terminal">Terminal</option>
+          <option value="iterm2">iTerm2</option>
+          <option value="ghostty">Ghostty</option>
+          <option value="warp">Warp</option>
+        </select>
+      </header>
       <ul id="project-list" class="scroll"></ul>
     </aside>
 

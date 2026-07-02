@@ -118,6 +118,28 @@ fn quick_title_falls_back_to_first_user_prompt() {
     assert_eq!(title.as_deref(), Some("Refactor the config loader"));
 }
 
+// P1: token stats accumulate over deduplicated logical messages; per
+// streamed message the last chunk's usage wins (final API totals).
+#[test]
+fn usage_totals_deduplicated() {
+    let session = provider().parse(&raw(SESSION_1)).unwrap();
+    let usage = &session.extensions["usage"];
+    assert_eq!(usage["inputTokens"], 300);
+    assert_eq!(usage["outputTokens"], 55); // 25 (msg_A final chunk) + 30
+    assert_eq!(usage["cacheReadTokens"], 500);
+    assert_eq!(usage["cacheCreationTokens"], 0);
+}
+
+#[test]
+fn subagents_carry_message_previews() {
+    let session = provider().parse(&raw(SESSION_1)).unwrap();
+    let subagents = session.extensions["subagents"].as_array().unwrap();
+    let messages = subagents[0]["messages"].as_array().unwrap();
+    assert_eq!(messages.len(), 2);
+    assert_eq!(messages[0]["role"], "user");
+    assert_eq!(messages[0]["preview"], "Explore the codebase for login handlers");
+}
+
 #[test]
 fn subagents_merged_in_fixed_order_into_extensions() {
     let session = provider().parse(&raw(SESSION_1)).unwrap();

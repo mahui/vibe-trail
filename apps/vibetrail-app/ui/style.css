@@ -202,3 +202,21 @@ details.thinking summary { color: var(--thinking); }
 .artifact { display: flex; gap: 8px; font-size: 12px; padding: 2px 0; }
 .artifact-name { font-weight: 600; flex-shrink: 0; }
 .artifact-summary { color: var(--text-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+#toast.info { background: #1d4ed8; }
+
+#terminal-select {
+  font: inherit;
+  font-size: 11px;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 2px 4px;
+}
+
+.subagent-messages { padding: 6px 10px; border-top: 1px solid var(--border); }
+.subagent-line {
+  font: 11px/1.6 ui-monospace, "SF Mono", Menlo, monospace;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
