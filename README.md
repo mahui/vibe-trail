@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/logo.png" alt="VibeTrail" width="128" height="128" />
+</p>
+
 # VibeTrail
 
 **Session browser & resume for coding agents (Claude Code, Codex, Antigravity, …)**
