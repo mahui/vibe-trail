@@ -58,9 +58,9 @@ vibetrail/                        # Cargo workspace
 
 ### ADR-5:License 与开源结构
 
-**状态:** 暂定(唯一待拍板项)
-**暂定:** MIT,单 repo 全开源。
-**备选:** open core(Core+CLI MIT,App 闭源收费)。当前判断:先全开源换社区与 star,付费能力(语义搜索等)出现时再评估拆分;Core/壳边界从第一天保持干净,保留拆分自由度。
+**状态:** 已接受(2026-07 拍板)
+**决定:** Apache-2.0,单 repo 全开源。选 Apache-2.0 而非 MIT:自带专利授权条款,对企业使用者更友好;与核心依赖(Tauri、ripgrep 引擎 crates)许可兼容。
+**备选(未采纳):** open core(Core+CLI 开源,App 闭源收费)。当前判断:先全开源换社区与 star,付费能力(语义搜索等)出现时再评估拆分;Core/壳边界从第一天保持干净,保留拆分自由度。
 
 ### ADR-6:Provider 抽象与准入原则
 

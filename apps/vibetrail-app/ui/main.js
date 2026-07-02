@@ -66,8 +66,22 @@ function idChip(nativeId, full = false) {
   return chip;
 }
 
-function providerLabel(id) {
-  return id === "antigravity" ? "antigravity (exp)" : id;
+const AGENT_META = {
+  "claude-code": { abbr: "CC", name: "Claude Code" },
+  "codex": { abbr: "CX", name: "Codex" },
+  "antigravity": { abbr: "AG", name: "Antigravity (experimental)" },
+};
+
+// Neutral lettermark badges — vendor logos are off-limits (trademark
+// hygiene); hover reveals the full agent name.
+function agentBadge(providerId) {
+  const meta = AGENT_META[providerId] || {
+    abbr: providerId.slice(0, 2).toUpperCase(),
+    name: providerId,
+  };
+  const badge = text("span", `agent-badge agent-${providerId}`, meta.abbr);
+  badge.title = meta.name;
+  return badge;
 }
 
 function shortPath(path) {
@@ -104,8 +118,11 @@ async function loadProjects() {
     const name = text("div", "name" + (project.exists ? "" : " orphaned"), shortPath(project.realPath));
     if (!project.exists) name.append(text("span", "", "⚠"));
     li.append(name);
-    li.append(text("div", "meta",
-      `${project.sessionCount} sessions · ${relativeTime(project.lastActive)} · ${[...project.providers].map(providerLabel).join(",")}`));
+    const meta = text("div", "meta");
+    meta.append(text("span", "",
+      `${project.sessionCount} sessions · ${relativeTime(project.lastActive)} `));
+    for (const provider of project.providers) meta.append(agentBadge(provider));
+    li.append(meta);
     if (project.lastPrompt) li.append(text("div", "prompt", project.lastPrompt));
     li.addEventListener("click", () => selectProject(project.realPath, li));
     el.projects.append(li);
@@ -227,6 +244,7 @@ function sessionRow(session) {
   li.append(text("div", "title", (depth > 0 ? "↳ " : "") + session.title));
   const branch = session.gitBranch ? ` · ${session.gitBranch}` : "";
   const meta = text("div", "meta");
+  meta.append(agentBadge(session.providerId));
   meta.append(idChip(session.nativeId));
   if (depth === 0 && (sessionState.chainSize.get(session.nativeId) || 0) > 0) {
     const badge = text("span", "chain-badge", chainBadgeLabel(session.nativeId));
@@ -238,7 +256,7 @@ function sessionRow(session) {
     meta.append(badge);
   }
   meta.append(text("span", "",
-    ` ${providerLabel(session.providerId)} · ${relativeTime(session.mtime)} · ${session.messageCount} msg${branch}`));
+    ` ${relativeTime(session.mtime)} · ${session.messageCount} msg${branch}`));
   li.append(meta);
   li.addEventListener("click", () => selectSession(session.id, li));
   return li;
@@ -379,6 +397,7 @@ async function loadDetail(sessionId) {
   el.title.classList.remove("placeholder");
   // Full id on its own line: long enough to matter, one click to copy.
   const idLine = text("span", "sub");
+  idLine.append(agentBadge(summary.providerId));
   idLine.append(idChip(summary.nativeId, true));
   el.title.replaceChildren(
     text("span", "", summary.title),
@@ -521,8 +540,10 @@ async function runSearch() {
   }
   for (const [sessionId, sessionHits] of groups) {
     const first = sessionHits[0];
-    el.results.append(text("li", "group-header",
-      `${first.projectPath} · ${first.nativeSessionId.slice(0, 8)}`));
+    const header = text("li", "group-header");
+    header.append(agentBadge(first.providerId));
+    header.append(text("span", "", ` ${first.projectPath} · ${first.nativeSessionId.slice(0, 8)}`));
+    el.results.append(header);
     for (const hit of sessionHits.slice(0, 5)) {
       const li = text("li", "hit");
       li.append(text("div", "snippet", hit.snippet));

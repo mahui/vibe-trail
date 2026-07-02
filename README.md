@@ -135,4 +135,4 @@ for the provider implementation guide and workflow rules.
 
 ## License
 
-[MIT](LICENSE)
+[Apache-2.0](LICENSE)

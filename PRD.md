@@ -96,7 +96,7 @@ macOS 上的 coding agent 重度用户(每天多个 session、多项目、可能
 
 ## 8. 开源策略
 
-- **License:** MIT(暂定,见 TECH_SPEC ADR-5)。
+- **License:** Apache-2.0(已定,见 TECH_SPEC ADR-5)。
 - **Repo:** `vibetrail`,description 与 topics 覆盖 `claude-code` / `codex` / `antigravity` / `session` / `resume` / `agent` 等搜索词——开源项目可发现性 > 品牌性,关键词全部放 metadata,不占名字。
 - **商标卫生:** README 显著位置声明 unofficial / not affiliated;产品名与图标不使用任何 agent 厂商品牌元素。
 - **分发:** CLI 走 Homebrew(复用现有 tap);App 提供 GitHub Releases 签名 dmg。

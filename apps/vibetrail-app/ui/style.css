@@ -313,3 +313,21 @@ button.load-full {
   cursor: pointer;
 }
 button.load-full:hover { border-color: var(--accent); }
+
+/* Agent lettermark badges (neutral — no vendor logos) */
+.agent-badge {
+  display: inline-block;
+  font: 600 9px/1 ui-monospace, "SF Mono", Menlo, monospace;
+  letter-spacing: 0.5px;
+  color: #fff;
+  border-radius: 4px;
+  padding: 3px 4px;
+  margin-right: 4px;
+  vertical-align: 1px;
+  cursor: default;
+  user-select: none;
+}
+.agent-claude-code { background: #c96442; }
+.agent-codex { background: #0f8a6d; }
+.agent-antigravity { background: #4a6fd4; }
+.agent-badge:not(.agent-claude-code):not(.agent-codex):not(.agent-antigravity) { background: var(--text-dim); }
