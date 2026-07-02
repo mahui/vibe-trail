@@ -37,7 +37,7 @@ fn raw(native_id: &str) -> RawSession {
 fn discovers_top_level_sessions_only() {
     let sessions = provider().discover().unwrap();
     // Subagent files under <session>/subagents/ must not surface as sessions.
-    assert_eq!(sessions.len(), 3);
+    assert_eq!(sessions.len(), 4);
     assert!(sessions
         .iter()
         .all(|s| s.project_path == "/Users/tester/demo-app"));
@@ -189,8 +189,39 @@ fn projects_aggregation() {
     let project = &projects[0];
     assert_eq!(project.real_path, "/Users/tester/demo-app");
     assert!(!project.exists);
-    assert_eq!(project.session_count, 3);
+    assert_eq!(project.session_count, 4);
     assert!(project.providers.contains("claude-code"));
+}
+
+// Tool results truncate for display at 2000 chars; message_full re-reads
+// the untruncated version from disk on demand.
+#[test]
+fn tool_results_truncate_with_full_on_demand() {
+    let provider = provider();
+    let raw = raw("44444444-4444-4444-4444-444444444444");
+    let session = provider.parse(&raw).unwrap();
+    let ContentBlock::ToolResult { summary, truncated } = &session.messages[1].blocks[0] else {
+        panic!("expected tool_result");
+    };
+    assert!(truncated);
+    assert_eq!(summary.chars().count(), 2000);
+    assert!(!summary.ends_with("END-MARKER"));
+
+    let full = provider
+        .message_full(&raw, "u2")
+        .unwrap()
+        .expect("message present");
+    let ContentBlock::ToolResult { summary, truncated } = &full.blocks[0] else {
+        panic!("expected tool_result");
+    };
+    assert!(!truncated);
+    assert_eq!(summary.chars().count(), 3000);
+    assert!(summary.ends_with("END-MARKER"));
+
+    assert!(provider
+        .message_full(&raw, "nonexistent")
+        .unwrap()
+        .is_none());
 }
 
 // Resume-fork files start with history copied from the parent; those lines

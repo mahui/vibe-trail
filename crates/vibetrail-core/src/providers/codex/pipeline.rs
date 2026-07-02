@@ -54,6 +54,13 @@ fn parse_timestamp(value: Option<&str>) -> Option<DateTime<Utc>> {
 /// Messages have no intrinsic id, so each gets `L<line-number>` (1-based),
 /// which search hit resolution reproduces for jump anchoring.
 pub fn run(data: &[u8]) -> CodexParseResult {
+    run_with_limit(data, RESULT_PREVIEW_CHARS)
+}
+
+/// Display truncation for tool results; full text re-read on demand.
+pub const RESULT_PREVIEW_CHARS: usize = 2000;
+
+pub fn run_with_limit(data: &[u8], result_limit: usize) -> CodexParseResult {
     let mut result = CodexParseResult::default();
     for (index, line) in data.split(|&b| b == b'\n').enumerate() {
         if line.is_empty() {
@@ -82,7 +89,9 @@ pub fn run(data: &[u8]) -> CodexParseResult {
             }
             Some("response_item") => {
                 let payload = entry.payload.unwrap_or(Value::Null);
-                if let Some((role, blocks)) = transform_response_item(&payload, &mut result.stats) {
+                if let Some((role, blocks)) =
+                    transform_response_item(&payload, result_limit, &mut result.stats)
+                {
                     if role == Role::User && result.first_user_prompt.is_none() {
                         if let Some(ContentBlock::Text { text }) = blocks.first() {
                             result.first_user_prompt = Some(text.trim().to_string());
@@ -111,6 +120,7 @@ pub fn run(data: &[u8]) -> CodexParseResult {
 /// Whitelist transform of `response_item` payloads to unified blocks.
 fn transform_response_item(
     payload: &Value,
+    result_limit: usize,
     stats: &mut CodexParseStats,
 ) -> Option<(Role, Vec<ContentBlock>)> {
     match payload.get("type").and_then(Value::as_str) {
@@ -193,8 +203,8 @@ fn transform_response_item(
         }
         Some("function_call_output") | Some("custom_tool_call_output") => {
             let full = payload.get("output").and_then(Value::as_str).unwrap_or("");
-            let summary: String = full.chars().take(200).collect();
-            let truncated = full.chars().count() > 200;
+            let summary: String = full.chars().take(result_limit).collect();
+            let truncated = full.chars().count() > result_limit;
             Some((
                 Role::User,
                 vec![ContentBlock::ToolResult { summary, truncated }],

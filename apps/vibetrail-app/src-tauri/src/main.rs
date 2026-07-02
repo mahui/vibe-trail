@@ -7,8 +7,8 @@ mod config;
 mod resumer;
 
 use vibetrail_core::{
-    search_store, AntigravityProvider, ClaudeCodeProvider, CodexProvider, Project, RawSession,
-    Scope, SearchHit, Session, SessionStore, SessionSummary,
+    search_store, AntigravityProvider, ClaudeCodeProvider, CodexProvider, Message, Project,
+    RawSession, Scope, SearchHit, Session, SessionStore, SessionSummary,
 };
 
 /// Stores are stateless (live reads, ADR-2), so each command builds one.
@@ -76,6 +76,19 @@ fn resume_session(session_id: String) -> Result<Option<String>, String> {
     resumer::resume(&spec, config::load().terminal).map_err(|e| e.to_string())
 }
 
+/// Untruncated message for "load full output": parse() truncates tool
+/// results for display; this re-reads just one message from disk.
+#[tauri::command]
+fn get_message_full(session_id: String, message_uuid: String) -> Result<Option<Message>, String> {
+    let store = store();
+    let (provider, raw) = store
+        .resolve_session(&session_id)
+        .map_err(|e| e.to_string())?;
+    provider
+        .message_full(&raw, &message_uuid)
+        .map_err(|e| e.to_string())
+}
+
 /// Rendered-markdown links open in the default browser, never inside the
 /// webview. Scheme whitelist keeps file:// and custom schemes out.
 #[tauri::command]
@@ -136,6 +149,7 @@ fn main() {
             list_session_handles,
             summarize_sessions,
             get_session,
+            get_message_full,
             search,
             can_resume,
             resume_session,

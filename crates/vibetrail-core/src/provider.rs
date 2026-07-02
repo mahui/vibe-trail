@@ -74,6 +74,14 @@ pub trait Provider: Send + Sync {
         self.summarize(raw).ok().map(|summary| summary.title)
     }
 
+    /// Untruncated version of one message, re-read from disk on demand —
+    /// parse() truncates tool results for display, and bulk-loading full
+    /// outputs would defeat that. None when the message is unknown.
+    fn message_full(&self, raw: &RawSession, message_uuid: &str) -> Result<Option<Message>> {
+        let _ = (raw, message_uuid);
+        Ok(None)
+    }
+
     /// Locate sessions whose native id equals or starts with `reference`.
     /// The default scans the full discovery; providers whose ids are encoded
     /// in file names (Codex) override with a listing-only lookup so that

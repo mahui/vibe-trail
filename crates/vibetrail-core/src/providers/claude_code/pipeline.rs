@@ -61,6 +61,14 @@ pub struct CcParseResult {
 /// entry decode → classify/filter → message regroup → tree rebuild → display
 /// transform. Stages are deliberately separate functions; do not fuse them.
 pub fn run(data: &[u8], include_sidechain: bool) -> CcParseResult {
+    run_with_limit(data, include_sidechain, RESULT_PREVIEW_CHARS)
+}
+
+/// Display truncation for tool results. Full text stays on disk and is
+/// re-read on demand (Provider::message_full) — never bulk-loaded.
+pub const RESULT_PREVIEW_CHARS: usize = 2000;
+
+pub fn run_with_limit(data: &[u8], include_sidechain: bool, result_limit: usize) -> CcParseResult {
     let mut result = CcParseResult::default();
     let entries = decode_entries(data, &mut result.stats);
     let kept = classify_and_filter(entries, include_sidechain, &mut result);
@@ -71,7 +79,7 @@ pub fn run(data: &[u8], include_sidechain: bool) -> CcParseResult {
             result.usage.add(usage);
         }
     }
-    result.messages = transform(ordered, &mut result.stats);
+    result.messages = transform(ordered, result_limit, &mut result.stats);
     result.first_user_prompt = first_user_prompt(&result.messages);
     result
 }
@@ -254,7 +262,11 @@ fn tree_order(messages: Vec<LogicalMessage>) -> Vec<LogicalMessage> {
 
 // ---- Stage 5: display transform ---------------------------------------------
 
-fn transform(messages: Vec<LogicalMessage>, stats: &mut CcParseStats) -> Vec<Message> {
+fn transform(
+    messages: Vec<LogicalMessage>,
+    result_limit: usize,
+    stats: &mut CcParseStats,
+) -> Vec<Message> {
     let mut transformed = Vec::with_capacity(messages.len());
     for message in messages {
         let mut blocks: Vec<ContentBlock> = Vec::new();
@@ -293,8 +305,8 @@ fn transform(messages: Vec<LogicalMessage>, stats: &mut CcParseStats) -> Vec<Mes
                 }),
                 Some("tool_result") => {
                     let full = flatten_tool_result(block.get("content"));
-                    let summary: String = full.chars().take(200).collect();
-                    let truncated = full.chars().count() > 200;
+                    let summary: String = full.chars().take(result_limit).collect();
+                    let truncated = full.chars().count() > result_limit;
                     blocks.push(ContentBlock::ToolResult { summary, truncated });
                 }
                 other => {

@@ -301,3 +301,15 @@ details.thinking summary { color: var(--thinking); }
   user-select: none;
 }
 .chain-badge:hover { border-color: var(--accent); }
+
+button.load-full {
+  margin: 6px 10px 8px;
+  padding: 2px 10px;
+  font: 11px inherit;
+  color: var(--accent);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  cursor: pointer;
+}
+button.load-full:hover { border-color: var(--accent); }

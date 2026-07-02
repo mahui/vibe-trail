@@ -313,7 +313,7 @@ function markdownNode(source) {
   return node;
 }
 
-function blockNode(block) {
+function blockNode(block, context) {
   switch (block.kind) {
     case "text": {
       return markdownNode(block.text);
@@ -327,7 +327,34 @@ function blockNode(block) {
     case "tool_result": {
       const details = text("details", "block result");
       details.append(text("summary", "", `Result${block.truncated ? " (truncated)" : ""}`));
-      details.append(text("pre", "", block.summary));
+      const pre = text("pre", "", block.summary);
+      details.append(pre);
+      if (block.truncated && context) {
+        const load = text("button", "load-full", "Load full output");
+        load.addEventListener("click", async (event) => {
+          event.preventDefault();
+          load.disabled = true;
+          load.textContent = "Loading…";
+          try {
+            const full = await invoke("get_message_full", {
+              sessionId: context.sessionId,
+              messageUuid: context.messageUuid,
+            });
+            const match = full && full.blocks && full.blocks[context.blockIndex];
+            if (match && match.kind === "tool_result") {
+              pre.textContent = match.summary;
+              load.remove();
+            } else {
+              load.textContent = "Full output unavailable";
+            }
+          } catch (error) {
+            toast(String(error));
+            load.disabled = false;
+            load.textContent = "Load full output";
+          }
+        });
+        details.append(load);
+      }
       return details;
     }
     case "thinking": {
@@ -414,7 +441,13 @@ function messageNode(message) {
   row.dataset.uuid = message.uuid;
   row.append(text("div", "avatar", message.role === "user" ? "❯" : "●"));
   const body = text("div", "body");
-  for (const block of message.blocks) body.append(blockNode(block));
+  message.blocks.forEach((block, blockIndex) => {
+    body.append(blockNode(block, {
+      sessionId: state.selectedSession,
+      messageUuid: message.uuid,
+      blockIndex,
+    }));
+  });
   row.append(body);
   return row;
 }

@@ -313,6 +313,13 @@ impl Provider for ClaudeCodeProvider {
         })
     }
 
+    fn message_full(&self, raw: &RawSession, message_uuid: &str) -> Result<Option<Message>> {
+        let data = fs::read(&raw.file_path)
+            .map_err(|e| Error::Data(format!("Cannot read {}: {e}", raw.file_path.display())))?;
+        let result = pipeline::run_with_limit(&data, false, usize::MAX);
+        Ok(result.messages.into_iter().find(|m| m.uuid == message_uuid))
+    }
+
     fn outline(&self, raw: &RawSession) -> Result<Vec<MessageStub>> {
         Ok(self
             .parse(raw)?

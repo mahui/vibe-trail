@@ -278,6 +278,12 @@ impl Provider for CodexProvider {
         })
     }
 
+    fn message_full(&self, raw: &RawSession, message_uuid: &str) -> Result<Option<Message>> {
+        let data = self.read_all(&raw.file_path)?;
+        let result = pipeline::run_with_limit(&data, usize::MAX);
+        Ok(result.messages.into_iter().find(|m| m.uuid == message_uuid))
+    }
+
     fn outline(&self, raw: &RawSession) -> Result<Vec<MessageStub>> {
         Ok(self
             .parse(raw)?

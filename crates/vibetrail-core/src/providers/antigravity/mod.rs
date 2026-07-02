@@ -14,6 +14,8 @@ use crate::store::normalize_path;
 use crate::textutil::{make_snippet, sanitize_title};
 
 const PROVIDER_ID: &str = "antigravity";
+/// Display truncation for tool results; full text re-read on demand.
+const RESULT_PREVIEW_CHARS: usize = 2000;
 /// Discovery-time reads stay bounded even though transcripts are small.
 const BOUNDED_READ: usize = 1024 * 1024;
 
@@ -71,6 +73,10 @@ impl AntigravityProvider {
     }
 
     fn run_pipeline(&self, data: &[u8]) -> AgyParseResult {
+        self.run_pipeline_with_limit(data, RESULT_PREVIEW_CHARS)
+    }
+
+    fn run_pipeline_with_limit(&self, data: &[u8], result_limit: usize) -> AgyParseResult {
         let mut result = AgyParseResult::default();
         let mut touched_paths: Vec<PathBuf> = Vec::new();
         for line in data.split(|&b| b == b'\n') {
@@ -109,7 +115,7 @@ impl AntigravityProvider {
                     tool @ ("VIEW_FILE" | "GREP_SEARCH" | "RUN_COMMAND" | "CODE_ACTION"
                     | "LIST_DIRECTORY" | "SEARCH_WEB" | "READ_URL_CONTENT"),
                 ) => {
-                    let summary: String = content.chars().take(200).collect();
+                    let summary: String = content.chars().take(result_limit).collect();
                     Some((
                         Role::Assistant,
                         vec![
@@ -119,7 +125,7 @@ impl AntigravityProvider {
                             },
                             ContentBlock::ToolResult {
                                 summary,
-                                truncated: content.chars().count() > 200,
+                                truncated: content.chars().count() > result_limit,
                             },
                         ],
                     ))
@@ -331,6 +337,12 @@ impl Provider for AntigravityProvider {
             messages: result.messages,
             extensions,
         })
+    }
+
+    fn message_full(&self, raw: &RawSession, message_uuid: &str) -> Result<Option<Message>> {
+        let data = self.read_transcript(raw)?;
+        let result = self.run_pipeline_with_limit(&data, usize::MAX);
+        Ok(result.messages.into_iter().find(|m| m.uuid == message_uuid))
     }
 
     fn outline(&self, raw: &RawSession) -> Result<Vec<MessageStub>> {

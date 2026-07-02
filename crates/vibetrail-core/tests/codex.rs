@@ -202,14 +202,14 @@ fn cross_provider_project_aggregation() {
     // Both fixtures use cwd /Users/tester/demo-app → a single merged project.
     assert_eq!(projects.len(), 1);
     let project = &projects[0];
-    assert_eq!(project.session_count, 6);
+    assert_eq!(project.session_count, 7);
     assert!(project.providers.contains("claude-code"));
     assert!(project.providers.contains("codex"));
 
     let sessions = store
         .sessions("/Users/tester/demo-app", None, None)
         .unwrap();
-    assert_eq!(sessions.len(), 6);
+    assert_eq!(sessions.len(), 7);
 
     // Provider-scoped listing still works.
     let codex_only = store
