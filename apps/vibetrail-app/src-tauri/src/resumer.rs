@@ -63,10 +63,20 @@ pub fn resume(spec: &ResumeSpec, terminal: TerminalKind) -> Result<Option<String
                 }
                 return Ok(None);
             }
-            // pbcopy + open -a: no AppleEvents involved, so no Automation
-            // permission — an unsigned dev build loses its TCC grant on
-            // every rebuild and the OS then denies silently.
             set_clipboard(&shell_command)?;
+            // Ghostty registers Finder services ("New Ghostty Tab Here",
+            // NSMessage openTab). NSPerformService drives the RUNNING
+            // instance through that battle-tested handler — no AppleEvents,
+            // no Automation permission, none of the preview scripting
+            // dictionary that crashed under load. It opens the tab in the
+            // project directory; only the command paste remains manual.
+            if perform_ghostty_tab_service(&spec.project_path) {
+                return Ok(Some(
+                    "New Ghostty tab opened at the project — press ⌘V then Enter to resume."
+                        .to_string(),
+                ));
+            }
+            // Service unavailable (renamed/removed): activate + clipboard.
             let status = Command::new("/usr/bin/open")
                 .args(["-a", "Ghostty"])
                 .status()
@@ -75,7 +85,7 @@ pub fn resume(spec: &ResumeSpec, terminal: TerminalKind) -> Result<Option<String
                 return Err(Error::Data("Failed to activate Ghostty".to_string()));
             }
             Ok(Some(
-                "Ghostty is running — the resume command is on your clipboard; paste it into a new tab. (Ghostty's automation API is still a preview and unstable when driven directly.)"
+                "Ghostty is running — the resume command is on your clipboard; paste it into a new tab."
                     .to_string(),
             ))
         }
@@ -100,6 +110,25 @@ pub fn resume(spec: &ResumeSpec, terminal: TerminalKind) -> Result<Option<String
             ))
         }
     }
+}
+
+/// Trigger Ghostty's "New Ghostty Tab Here" Finder service for a directory
+/// via NSPerformService (JXA bridge — plain AppKit, no permission surface).
+fn perform_ghostty_tab_service(directory: &str) -> bool {
+    let escaped = directory.replace('\\', "\\\\").replace('\'', "\\'");
+    let script = format!(
+        "ObjC.import('Cocoa');\n\
+         const pb = $.NSPasteboard.pasteboardWithUniqueName;\n\
+         pb.clearContents;\n\
+         pb.declareTypesOwner($([$.NSFilenamesPboardType]), null);\n\
+         pb.setPropertyListForType($(['{escaped}']), $.NSFilenamesPboardType);\n\
+         $.NSPerformService('New Ghostty Tab Here', pb) ? 'ok' : 'fail'"
+    );
+    Command::new("/usr/bin/osascript")
+        .args(["-l", "JavaScript", "-e", &script])
+        .output()
+        .map(|out| out.status.success() && String::from_utf8_lossy(&out.stdout).trim() == "ok")
+        .unwrap_or(false)
 }
 
 fn set_clipboard(text: &str) -> Result<()> {
