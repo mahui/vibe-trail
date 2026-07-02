@@ -132,10 +132,23 @@ async function selectSession(sessionId, li) {
 
 // ---- detail timeline (F3) ---------------------------------------------------
 
+// Transcript text is untrusted input: always parse with marked, then
+// sanitize with DOMPurify before it touches the DOM.
+function markdownNode(source) {
+  const node = text("div", "block-text md");
+  if (window.marked && window.DOMPurify) {
+    node.innerHTML = DOMPurify.sanitize(
+      marked.parse(source, { gfm: true, breaks: true, async: false }));
+  } else {
+    node.textContent = source;
+  }
+  return node;
+}
+
 function blockNode(block) {
   switch (block.kind) {
     case "text": {
-      return text("div", "block-text", block.text);
+      return markdownNode(block.text);
     }
     case "tool_use": {
       const details = text("details", "block tool");
@@ -344,4 +357,13 @@ async function initConfig() {
 }
 
 initConfig();
+// Links inside rendered markdown must not navigate the webview; hand them
+// to the system browser instead.
+el.timeline.addEventListener("click", (event) => {
+  const link = event.target.closest("a[href]");
+  if (!link) return;
+  event.preventDefault();
+  call("open_external", { url: link.href });
+});
+
 loadProjects();

@@ -72,6 +72,26 @@ fn resume_session(session_id: String) -> Result<Option<String>, String> {
     resumer::resume(&spec, config::load().terminal).map_err(|e| e.to_string())
 }
 
+/// Rendered-markdown links open in the default browser, never inside the
+/// webview. Scheme whitelist keeps file:// and custom schemes out.
+#[tauri::command]
+fn open_external(url: String) -> Result<(), String> {
+    if !url.starts_with("https://") && !url.starts_with("http://") {
+        return Err("Only http(s) links can be opened".to_string());
+    }
+    std::process::Command::new("/usr/bin/open")
+        .arg(&url)
+        .status()
+        .map_err(|e| e.to_string())
+        .and_then(|status| {
+            if status.success() {
+                Ok(())
+            } else {
+                Err("Failed to open link".to_string())
+            }
+        })
+}
+
 #[tauri::command]
 fn get_config() -> config::AppConfig {
     config::load()
@@ -91,6 +111,7 @@ fn main() {
             search,
             can_resume,
             resume_session,
+            open_external,
             get_config,
             set_config,
         ])
