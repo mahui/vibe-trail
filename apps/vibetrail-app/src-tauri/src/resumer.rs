@@ -36,40 +36,40 @@ pub fn resume(spec: &ResumeSpec, terminal: TerminalKind) -> Result<Option<String
             Ok(None)
         }
         TerminalKind::Ghostty => {
-            // Ghostty 1.3+ has a scripting dictionary: a new window in the
-            // RUNNING instance (no second process / duplicate Dock icon,
-            // which `open -n` caused). `initial input` types the command
-            // into the shell, so it stays interactive after the agent exits.
-            let command_line = spec
-                .command
-                .iter()
-                .map(|arg| shell_quote(arg))
-                .collect::<Vec<_>>()
-                .join(" ");
-            let script = format!(
-                "tell application \"Ghostty\"\nactivate\nnew window with configuration {{initial working directory: \"{}\", initial input: \"{}\" & linefeed}}\nend tell",
-                applescript_escape(&spec.project_path),
-                applescript_escape(&command_line)
-            );
-            if run_osascript(&script).is_ok() {
+            // Ghostty's scripting dictionary (1.3) is an explicit preview —
+            // driving it crashed the app in the field (upstream: breaking
+            // changes expected in 1.4, new-tab crash issues open). Until it
+            // stabilizes: a cold start takes launch args (single instance,
+            // no duplicate Dock icon), a running instance degrades to
+            // clipboard like Warp.
+            let running = Command::new("/usr/bin/osascript")
+                .args(["-e", "application \"Ghostty\" is running"])
+                .output()
+                .ok()
+                .map(|out| String::from_utf8_lossy(&out.stdout).trim() == "true")
+                .unwrap_or(false);
+            if !running {
+                let status = Command::new("/usr/bin/open")
+                    .args(["-a", "Ghostty", "--args"])
+                    .arg(format!("--working-directory={}", spec.project_path))
+                    .args(["-e", "sh", "-lc"])
+                    .arg(format!("{shell_command}; exec ${{SHELL:-/bin/zsh}}"))
+                    .status()
+                    .map_err(|e| Error::Data(format!("Failed to launch Ghostty: {e}")))?;
+                if !status.success() {
+                    return Err(Error::Data(
+                        "Ghostty launch failed; is it installed?".to_string(),
+                    ));
+                }
                 return Ok(None);
             }
-            // Older Ghostty without the dictionary: fall back to a fresh
-            // instance (args only apply at launch — this is the path that
-            // shows a second Dock icon, hence last resort).
-            let status = Command::new("/usr/bin/open")
-                .args(["-na", "Ghostty", "--args"])
-                .arg(format!("--working-directory={}", spec.project_path))
-                .args(["-e", "sh", "-lc", &shell_command])
-                .status()
-                .map_err(|e| Error::Data(format!("Failed to launch Ghostty: {e}")))?;
-            if !status.success() {
-                return Err(Error::Data(
-                    "Ghostty launch failed; is it installed?".to_string(),
-                ));
-            }
+            run_osascript(&format!(
+                "set the clipboard to \"{}\"",
+                applescript_escape(&shell_command)
+            ))?;
+            run_osascript("tell application \"Ghostty\" to activate")?;
             Ok(Some(
-                "Opened a separate Ghostty instance (this Ghostty version has no scripting support)."
+                "Ghostty is running — the resume command is on your clipboard; paste it into a new tab. (Ghostty's automation API is still a preview and unstable when driven directly.)"
                     .to_string(),
             ))
         }

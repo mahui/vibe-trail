@@ -53,7 +53,8 @@ vibetrail/                        # Cargo workspace
 
 **状态:** 已接受
 **CLI:** 校验路径后 `chdir` 到项目路径并 `exec` provider 给出的 resume 命令(Unix `CommandExt::exec`)。
-**GUI:** Tauri 后端(Rust)按用户配置的终端拉起执行(P1 已交付,配置在 `~/.config/vibetrail/config.json`):Terminal.app / iTerm2 经 `osascript` 直接执行;Ghostty 经 `open -na Ghostty --args --working-directory … -e`;Warp 无可脚本化的"执行命令"面,降级为打开项目目录 + resume 命令入剪贴板并提示用户粘贴。
+**GUI:** Tauri 后端(Rust)按用户配置的终端拉起执行(P1 已交付,配置在 `~/.config/vibetrail/config.json`):Terminal.app / iTerm2 经 `osascript` 直接执行;Warp 无可脚本化的"执行命令"面,降级为打开项目目录 + resume 命令入剪贴板并提示用户粘贴。
+**Ghostty 教训(2026-07):** 其 AppleScript 字典(1.3)是官方声明的 preview——实测连续 resume 会把 Ghostty 驱动到崩溃,已撤回依赖。现行为:未运行 → `open -a`(不带 `-n`)冷启动传参,单实例无重复图标,命令尾接 `exec $SHELL` 保持交互;已运行 → 激活 + 命令入剪贴板(同 Warp 降级)。等 Ghostty 1.4 scripting 稳定后再评估恢复直接执行。禁止用 `open -n`(每次 resume 多一个 Dock 图标)与 System Events keystroke(需辅助功能权限,且中文输入法下键击注入乱码)。
 **安全:** 无网络监听面;AppleScript 需 Automation 权限,首次触发引导授权。config.json 是 VibeTrail 唯一写入的文件,agent 存储目录仍严格只读。
 
 ### ADR-5:License 与开源结构
