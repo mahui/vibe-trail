@@ -36,6 +36,27 @@ pub fn resume(spec: &ResumeSpec, terminal: TerminalKind) -> Result<Option<String
             Ok(None)
         }
         TerminalKind::Ghostty => {
+            // Ghostty 1.3+ has a scripting dictionary: a new window in the
+            // RUNNING instance (no second process / duplicate Dock icon,
+            // which `open -n` caused). `initial input` types the command
+            // into the shell, so it stays interactive after the agent exits.
+            let command_line = spec
+                .command
+                .iter()
+                .map(|arg| shell_quote(arg))
+                .collect::<Vec<_>>()
+                .join(" ");
+            let script = format!(
+                "tell application \"Ghostty\"\nactivate\nnew window with configuration {{initial working directory: \"{}\", initial input: \"{}\" & linefeed}}\nend tell",
+                applescript_escape(&spec.project_path),
+                applescript_escape(&command_line)
+            );
+            if run_osascript(&script).is_ok() {
+                return Ok(None);
+            }
+            // Older Ghostty without the dictionary: fall back to a fresh
+            // instance (args only apply at launch — this is the path that
+            // shows a second Dock icon, hence last resort).
             let status = Command::new("/usr/bin/open")
                 .args(["-na", "Ghostty", "--args"])
                 .arg(format!("--working-directory={}", spec.project_path))
@@ -47,7 +68,10 @@ pub fn resume(spec: &ResumeSpec, terminal: TerminalKind) -> Result<Option<String
                     "Ghostty launch failed; is it installed?".to_string(),
                 ));
             }
-            Ok(None)
+            Ok(Some(
+                "Opened a separate Ghostty instance (this Ghostty version has no scripting support)."
+                    .to_string(),
+            ))
         }
         TerminalKind::Warp => {
             run_osascript(&format!(
