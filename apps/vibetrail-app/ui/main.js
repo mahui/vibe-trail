@@ -56,8 +56,8 @@ async function copySessionId(nativeId) {
   }
 }
 
-function idChip(nativeId) {
-  const chip = text("span", "id-chip", nativeId.slice(0, 8));
+function idChip(nativeId, full = false) {
+  const chip = text("span", "id-chip", full ? nativeId : nativeId.slice(0, 8));
   chip.title = `${nativeId}\nClick to copy`;
   chip.addEventListener("click", (event) => {
     event.stopPropagation();
@@ -248,19 +248,21 @@ function blockNode(block) {
 async function loadDetail(sessionId) {
   const session = await call("get_session", { sessionId });
   const summary = session.summary;
-  let sub = ` · ${summary.projectPath} · ${summary.messageCount} messages`;
+  let sub = `${summary.projectPath} · ${summary.messageCount} messages`;
   const usage = session.extensions && session.extensions.usage;
   if (usage) {
     sub += ` · tokens ↑${compact(usage.inputTokens + usage.cacheCreationTokens + usage.cacheReadTokens)} ↓${compact(usage.outputTokens)}`;
   }
   el.title.classList.remove("placeholder");
-  const subLine = text("span", "sub");
-  subLine.append(idChip(summary.nativeId));
-  subLine.append(text("span", "", sub));
+  // Full id on its own line: long enough to matter, one click to copy.
+  const idLine = text("span", "sub");
+  idLine.append(idChip(summary.nativeId, true));
   el.title.replaceChildren(
     text("span", "", summary.title),
     document.createElement("br"),
-    subLine,
+    idLine,
+    document.createElement("br"),
+    text("span", "sub", sub),
   );
   el.timeline.replaceChildren();
   const artifacts = session.extensions && session.extensions.artifacts;
