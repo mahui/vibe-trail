@@ -198,6 +198,8 @@ Tauri v2:Rust 薄壳注册 commands(`list_projects` / `list_sessions` / `get_ses
 
 tool call / result / thinking 折叠为单行摘要,点击展开;超长 tool result 截断 + "展开全文";搜索结果点击 → 详情页 `scrollTo(messageUuid)`。
 
+**图标纪律:** 图标源图必须遵守 Apple 图标网格——内容(squircle)占画布 824/1024(80.5%),四边各留 ~9.8% 透明边距,圆角半径 22.5%。满幅填充的图标在 macOS(尤其 15+)的 Dock 里会比系统图标大一圈。`bundle.icon` 与运行时 Dock 图标共用 `icons/icon.png`,换图时先量 bbox 再提交。
+
 ## 8. 性能预算
 
 | 场景 | 预算 | 手段 |
