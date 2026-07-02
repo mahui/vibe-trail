@@ -76,6 +76,7 @@ protocol Provider {
     func outline(_ raw: RawSession) throws -> [MessageStub] // 懒加载
     func page(_ raw: RawSession, offset: Int, limit: Int) throws -> [Message]
     func resumeSpec(_ s: SessionSummary) -> ResumeSpec?     // nil = 不可 resume
+    func quickTitle(_ raw: RawSession) throws -> String?    // 元数据级标题提取(项目总览用);默认实现回退全量 parse
 }
 
 struct ProviderCapabilities {
