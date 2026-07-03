@@ -10,7 +10,7 @@ use serde_json::{json, Value};
 
 use crate::error::{Error, Result};
 use crate::model::{ContentBlock, Message, MessageStub, Session, SessionSummary};
-use crate::provider::{Provider, ProviderCapabilities, RawSession, ResumeSpec};
+use crate::provider::{LaunchMode, Provider, ProviderCapabilities, RawSession, ResumeSpec};
 use crate::search::SearchHit;
 use crate::store::normalize_path;
 use crate::textutil::{make_snippet, sanitize_title};
@@ -29,14 +29,19 @@ pub struct ClaudeCodeProvider {
 }
 
 impl ClaudeCodeProvider {
+    /// Default store root; the settings layer surfaces it and may override
+    /// it per provider (TECH_SPEC §12).
+    pub fn default_root() -> PathBuf {
+        dirs::home_dir()
+            .unwrap_or_default()
+            .join(".claude")
+            .join("projects")
+    }
+
     pub fn new(root: Option<PathBuf>) -> Self {
-        let root = root.unwrap_or_else(|| {
-            dirs::home_dir()
-                .unwrap_or_default()
-                .join(".claude")
-                .join("projects")
-        });
-        Self { root }
+        Self {
+            root: root.unwrap_or_else(Self::default_root),
+        }
     }
 
     /// Metadata-level cwd extraction: scan only the head of the file for the
@@ -349,6 +354,7 @@ impl Provider for ClaudeCodeProvider {
                 "--resume".to_string(),
                 raw.native_id.clone(),
             ],
+            launch: LaunchMode::default(),
         })
     }
 

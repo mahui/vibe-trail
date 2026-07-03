@@ -17,6 +17,8 @@ walkdir = "2"
 dirs = "6"
 zstd = "0.13"
 rayon = "1"
+rusqlite = { version = "0.40.1", features = ["bundled"] }
 
 [dev-dependencies]
+rusqlite = { version = "0.40.1", features = ["bundled"] }
 tempfile = "3"

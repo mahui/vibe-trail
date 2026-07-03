@@ -264,13 +264,29 @@ fn print_full(message: &Message) {
 }
 
 /// ADR-4 CLI resume: chdir into the project, then exec the provider's resume
-/// command, replacing this process. Never returns on success.
+/// command, replacing this process. Never returns on success — except for
+/// GUI-app sessions (Cursor), whose launcher returns immediately.
 pub fn resume(store: &SessionStore, session_id: &str) -> Result<()> {
     let spec = store.resume_spec_for(session_id)?;
     let (program, args) = spec
         .command
         .split_first()
         .ok_or_else(|| Error::Data("Empty resume command".to_string()))?;
+    if spec.launch == vibetrail_core::LaunchMode::GuiApp {
+        let status = std::process::Command::new(program)
+            .args(args)
+            .current_dir(&spec.project_path)
+            .status()
+            .map_err(|e| Error::Data(format!("Failed to run {}: {e}", spec.command.join(" "))))?;
+        if !status.success() {
+            return Err(Error::Data(format!(
+                "Launcher failed: {}",
+                spec.command.join(" ")
+            )));
+        }
+        println!("Opened the app at the project — pick this session up from its chat history.");
+        return Ok(());
+    }
     let error = std::process::Command::new(program)
         .args(args)
         .current_dir(&spec.project_path)
@@ -280,6 +296,43 @@ pub fn resume(store: &SessionStore, session_id: &str) -> Result<()> {
         "Failed to exec {}: {error}",
         spec.command.join(" ")
     )))
+}
+
+/// `vibetrail config`: the effective settings — config file location, which
+/// providers are enabled and which store roots are in effect.
+pub fn config_report(json: bool) -> Result<()> {
+    let report = vibetrail_core::config::report(&vibetrail_core::config::load_discovery());
+    if json {
+        println!("{}", to_json(&report)?);
+        return Ok(());
+    }
+    println!("config file: {}", format::abbreviate_path(&report.path));
+    for provider in &report.providers {
+        let state = if provider.enabled {
+            "enabled"
+        } else {
+            "disabled"
+        };
+        let mut notes = Vec::new();
+        if provider.root_is_custom {
+            notes.push("custom");
+        }
+        if !provider.root_exists {
+            notes.push("missing");
+        }
+        let suffix = if notes.is_empty() {
+            String::new()
+        } else {
+            format!("  ({})", notes.join(", "))
+        };
+        println!(
+            "  {} {} {}{suffix}",
+            format::pad(&provider.id, 13),
+            format::pad(state, 9),
+            format::abbreviate_path(&provider.root),
+        );
+    }
+    Ok(())
 }
 
 pub fn open_gui(project: Option<&str>) -> Result<()> {

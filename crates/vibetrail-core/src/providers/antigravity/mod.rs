@@ -59,13 +59,18 @@ struct AgyParseResult {
 }
 
 impl AntigravityProvider {
+    /// Default store root; the settings layer surfaces it and may override
+    /// it per provider (TECH_SPEC §12).
+    pub fn default_root() -> PathBuf {
+        dirs::home_dir()
+            .unwrap_or_default()
+            .join(".gemini/antigravity/brain")
+    }
+
     pub fn new(root: Option<PathBuf>) -> Self {
-        let root = root.unwrap_or_else(|| {
-            dirs::home_dir()
-                .unwrap_or_default()
-                .join(".gemini/antigravity/brain")
-        });
-        Self { root }
+        Self {
+            root: root.unwrap_or_else(Self::default_root),
+        }
     }
 
     fn transcript_path(&self, conversation_dir: &Path) -> PathBuf {

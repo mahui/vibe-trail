@@ -3,6 +3,7 @@
 //! or removing one is a breaking change.
 
 use chrono::{DateTime, Utc};
+use vibetrail_core::config::{ConfigReport, ProviderStatus};
 use vibetrail_core::{ContentBlock, Message, Project, Role, SearchHit, SessionSummary};
 
 fn fixed_time() -> DateTime<Utc> {
@@ -78,6 +79,37 @@ fn search_hit_snapshot() {
   "snippet": "reads certificate path from env"
 }"#;
     assert_eq!(serde_json::to_string_pretty(&hit).unwrap(), expected);
+}
+
+#[test]
+fn config_report_snapshot() {
+    let report = ConfigReport {
+        path: "/Users/tester/.config/vibetrail/config.json".to_string(),
+        providers: vec![ProviderStatus {
+            id: "codex".to_string(),
+            name: "Codex".to_string(),
+            enabled: false,
+            root: "/Users/tester/alt/codex".to_string(),
+            default_root: "/Users/tester/.codex/sessions".to_string(),
+            root_is_custom: true,
+            root_exists: false,
+        }],
+    };
+    let expected = r#"{
+  "path": "/Users/tester/.config/vibetrail/config.json",
+  "providers": [
+    {
+      "id": "codex",
+      "name": "Codex",
+      "enabled": false,
+      "root": "/Users/tester/alt/codex",
+      "defaultRoot": "/Users/tester/.codex/sessions",
+      "rootIsCustom": true,
+      "rootExists": false
+    }
+  ]
+}"#;
+    assert_eq!(serde_json::to_string_pretty(&report).unwrap(), expected);
 }
 
 #[test]

@@ -1,0 +1,19 @@
+{
+  "allComposers": [
+    {
+      "type": "head",
+      "composerId": "aaaa1111-0000-4000-8000-000000000001",
+      "createdAt": 1751500000000,
+      "lastUpdatedAt": 1751500600000,
+      "unifiedMode": "agent",
+      "isArchived": false
+    },
+    {
+      "type": "head",
+      "composerId": "bbbb2222-0000-4000-8000-000000000002",
+      "createdAt": 1751400000000,
+      "unifiedMode": "chat",
+      "isArchived": false
+    }
+  ]
+}

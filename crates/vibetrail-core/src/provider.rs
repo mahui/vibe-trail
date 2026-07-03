@@ -40,12 +40,25 @@ impl RawSession {
     }
 }
 
+/// How a resume command wants to be launched (ADR-4). Terminal commands are
+/// interactive and need a terminal to live in; GUI-app sessions (Cursor) are
+/// handed to a detached `open`-style command that returns immediately.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum LaunchMode {
+    #[default]
+    Terminal,
+    GuiApp,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ResumeSpec {
     pub project_path: String,
     /// argv of the resume command, e.g. ["claude", "--resume", "<uuid>"].
     pub command: Vec<String>,
+    #[serde(default)]
+    pub launch: LaunchMode,
 }
 
 pub trait Provider: Send + Sync {

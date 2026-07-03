@@ -3,7 +3,7 @@ mod format;
 
 use clap::error::ErrorKind;
 use clap::{Parser, Subcommand};
-use vibetrail_core::{AntigravityProvider, ClaudeCodeProvider, CodexProvider, SessionStore};
+use vibetrail_core::SessionStore;
 
 #[derive(Parser)]
 #[command(
@@ -76,14 +76,18 @@ enum Command {
         /// Optional project to open at.
         project: Option<String>,
     },
+    /// Show the effective configuration (config file, providers, store roots).
+    Config {
+        /// Emit JSON.
+        #[arg(long)]
+        json: bool,
+    },
 }
 
+/// Both shells build the store from ~/.config/vibetrail/config.json (TECH_SPEC
+/// §12), so provider enable/root settings behave identically in CLI and GUI.
 fn store() -> SessionStore {
-    SessionStore::new(vec![
-        Box::new(ClaudeCodeProvider::new(None)),
-        Box::new(CodexProvider::new(None)),
-        Box::new(AntigravityProvider::new(None)),
-    ])
+    vibetrail_core::config::default_store()
 }
 
 fn main() {
@@ -128,6 +132,7 @@ fn main() {
         } => commands::show(&store(), &session_id, full, json),
         Command::Resume { session_id } => commands::resume(&store(), &session_id),
         Command::Open { project } => commands::open_gui(project.as_deref()),
+        Command::Config { json } => commands::config_report(json),
     };
     if let Err(error) = result {
         eprintln!("vibetrail: {error}");

@@ -1,0 +1,2 @@
+{"id":"n1","session_id":"eeee5555-0000-4000-8000-000000000005","role":"user","parts":[{"type":"text","data":{"type":"text","text":"Continue: also debounce the exponential backoff retry indicator"}}],"created_at":1751601000000,"is_meta":false}
+{"id":"n2","session_id":"eeee5555-0000-4000-8000-000000000005","role":"assistant","parts":[{"type":"text","data":{"type":"text","text":"Done — the indicator now updates at most once per second."}},{"type":"finish","data":{"reason":"stop","time":1751601200000}}],"created_at":1751601100000,"is_meta":false}

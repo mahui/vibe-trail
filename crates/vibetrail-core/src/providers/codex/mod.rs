@@ -9,7 +9,7 @@ use serde_json::{json, Value};
 
 use crate::error::{Error, Result};
 use crate::model::{ContentBlock, Message, MessageStub, Session, SessionSummary};
-use crate::provider::{Provider, ProviderCapabilities, RawSession, ResumeSpec};
+use crate::provider::{LaunchMode, Provider, ProviderCapabilities, RawSession, ResumeSpec};
 use crate::search::SearchHit;
 use crate::store::normalize_path;
 use crate::textutil::{make_snippet, sanitize_title};
@@ -29,14 +29,19 @@ pub struct CodexProvider {
 }
 
 impl CodexProvider {
+    /// Default store root; the settings layer surfaces it and may override
+    /// it per provider (TECH_SPEC §12).
+    pub fn default_root() -> PathBuf {
+        dirs::home_dir()
+            .unwrap_or_default()
+            .join(".codex")
+            .join("sessions")
+    }
+
     pub fn new(root: Option<PathBuf>) -> Self {
-        let root = root.unwrap_or_else(|| {
-            dirs::home_dir()
-                .unwrap_or_default()
-                .join(".codex")
-                .join("sessions")
-        });
-        Self { root }
+        Self {
+            root: root.unwrap_or_else(Self::default_root),
+        }
     }
 
     fn rollout_files(&self) -> Vec<PathBuf> {
@@ -313,6 +318,7 @@ impl Provider for CodexProvider {
                 "resume".to_string(),
                 raw.native_id.clone(),
             ],
+            launch: LaunchMode::default(),
         })
     }
 

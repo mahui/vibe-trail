@@ -1,0 +1,93 @@
+{
+  "composerData:aaaa1111-0000-4000-8000-000000000001": {
+    "_v": 3,
+    "composerId": "aaaa1111-0000-4000-8000-000000000001",
+    "name": "Fix CORS preflight failure",
+    "createdAt": 1751500000000,
+    "richText": "",
+    "text": "",
+    "status": "none",
+    "fullConversationHeadersOnly": [
+      { "bubbleId": "b1", "type": 1 },
+      { "bubbleId": "b2", "type": 2, "serverBubbleId": "s2" },
+      { "bubbleId": "b3", "type": 2 },
+      { "bubbleId": "b-missing", "type": 2 },
+      { "bubbleId": "b4", "type": 2 },
+      { "bubbleId": "b5", "type": 2 }
+    ],
+    "conversationMap": {}
+  },
+  "bubbleId:aaaa1111-0000-4000-8000-000000000001:b1": {
+    "_v": 3,
+    "bubbleId": "b1",
+    "type": 1,
+    "text": "Why does the CORS preflight fail on /api/upload?",
+    "isAgentic": true,
+    "tokenCount": { "inputTokens": 18, "outputTokens": 0 }
+  },
+  "bubbleId:aaaa1111-0000-4000-8000-000000000001:b2": {
+    "_v": 3,
+    "bubbleId": "b2",
+    "type": 2,
+    "text": "",
+    "thinking": {
+      "text": "allowCredentials(true) cannot be combined with a wildcard origin — that is a CORS spec restriction."
+    },
+    "allThinkingBlocks": [],
+    "toolFormerData": {
+      "tool": 5,
+      "toolCallId": "call-001",
+      "name": "read_file",
+      "rawArgs": "{\"path\":\"server/cors.ts\"}",
+      "params": "{\"path\":\"server/cors.ts\"}",
+      "result": "{\"contents\":\"app.use(cors({ origin: '*', credentials: true }))\"}",
+      "status": "completed",
+      "additionalData": {}
+    }
+  },
+  "bubbleId:aaaa1111-0000-4000-8000-000000000001:b3": {
+    "_v": 3,
+    "bubbleId": "b3",
+    "type": 2,
+    "text": "Replace the wildcard origin with an explicit allow-list whenever credentials are enabled."
+  },
+  "bubbleId:aaaa1111-0000-4000-8000-000000000001:b4": {
+    "_v": 3,
+    "bubbleId": "b4",
+    "type": 7,
+    "text": "future bubble kind that must be ignored, not fatal"
+  },
+  "bubbleId:aaaa1111-0000-4000-8000-000000000001:b5": {
+    "_v": 3,
+    "bubbleId": "b5",
+    "type": 2,
+    "text": "",
+    "allThinkingBlocks": []
+  },
+  "composerData:bbbb2222-0000-4000-8000-000000000002": {
+    "composerId": "bbbb2222-0000-4000-8000-000000000002",
+    "createdAt": 1751400000000,
+    "richText": "",
+    "text": "",
+    "status": "none",
+    "conversation": [
+      {
+        "bubbleId": "lb1",
+        "type": 1,
+        "text": "Add retry logic to the sync job"
+      },
+      {
+        "bubbleId": "lb2",
+        "type": 2,
+        "text": "Wrapped the sync call in exponential backoff with a five-attempt cap."
+      }
+    ]
+  },
+  "composerData:cccc3333-0000-4000-8000-000000000003": {
+    "_v": 3,
+    "composerId": "cccc3333-0000-4000-8000-000000000003",
+    "name": "Orphan chat from a deleted workspace",
+    "createdAt": 1751300000000,
+    "fullConversationHeadersOnly": []
+  }
+}

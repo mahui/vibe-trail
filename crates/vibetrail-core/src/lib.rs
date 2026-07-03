@@ -5,6 +5,7 @@
 //! agent stores are opened strictly read-only; provider-specific knowledge
 //! stays inside `providers::*`.
 
+pub mod config;
 pub mod error;
 pub mod model;
 pub mod provider;
@@ -16,10 +17,12 @@ pub(crate) mod textutil;
 
 pub use error::{Error, Result};
 pub use model::{ContentBlock, Message, MessageStub, Project, Role, Session, SessionSummary};
-pub use provider::{Provider, ProviderCapabilities, RawSession, ResumeSpec};
+pub use provider::{LaunchMode, Provider, ProviderCapabilities, RawSession, ResumeSpec};
 pub use providers::antigravity::AntigravityProvider;
 pub use providers::claude_code::ClaudeCodeProvider;
 pub use providers::codex::CodexProvider;
+pub use providers::cursor::CursorProvider;
+pub use providers::qoder::QoderProvider;
 pub use resume::Resumer;
 pub use search::{search_store, GrepSearchEngine, Scope, SearchEngine, SearchHit};
 pub use store::{normalize_path, SessionStore};
