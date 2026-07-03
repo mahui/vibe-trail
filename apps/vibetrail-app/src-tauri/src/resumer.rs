@@ -1,6 +1,6 @@
 use std::process::Command;
 
-use vibetrail_core::{Error, Result, ResumeSpec};
+use vibetrail_core::{Error, LaunchMode, Result, ResumeSpec};
 
 use crate::config::TerminalKind;
 
@@ -9,8 +9,33 @@ use crate::config::TerminalKind;
 /// its CLI args; Warp has no scriptable "run command" surface, so it degrades
 /// to opening the project and putting the command on the clipboard.
 ///
+/// GUI-app sessions (Cursor) skip the terminal entirely: their command is a
+/// detached launcher (`open -a …`) that brings the owning client to the
+/// project; session-level deep links don't exist yet (ADR-4).
+///
 /// Returns an optional user-facing note describing a degraded path.
 pub fn resume(spec: &ResumeSpec, terminal: TerminalKind) -> Result<Option<String>> {
+    if spec.launch == LaunchMode::GuiApp {
+        let (program, args) = spec
+            .command
+            .split_first()
+            .ok_or_else(|| Error::Data("Empty resume command".to_string()))?;
+        let status = Command::new(program)
+            .args(args)
+            .current_dir(&spec.project_path)
+            .status()
+            .map_err(|e| Error::Data(format!("Failed to run {}: {e}", spec.command.join(" "))))?;
+        if !status.success() {
+            return Err(Error::Data(format!(
+                "App launch failed: {} — is it installed?",
+                spec.command.join(" ")
+            )));
+        }
+        return Ok(Some(
+            "Opened the app at the project — pick this session up from its chat history."
+                .to_string(),
+        ));
+    }
     let shell_command = format!(
         "cd {} && {}",
         shell_quote(&spec.project_path),

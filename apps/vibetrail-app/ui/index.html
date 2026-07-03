@@ -10,20 +10,15 @@
   <div id="app">
     <aside id="sidebar">
       <header class="pane-header">
-        <span style="flex:1">Projects</span>
-        <select id="terminal-select" title="Terminal used by Resume">
-          <option value="terminal">Terminal</option>
-          <option value="iterm2">iTerm2</option>
-          <option value="ghostty">Ghostty</option>
-          <option value="warp">Warp</option>
-        </select>
+        <span style="flex:1" data-i18n="app.projects">Projects</span>
+        <button id="settings-btn" data-i18n-title="app.settingsTitle" title="Settings">⚙</button>
       </header>
       <ul id="project-list" class="scroll"></ul>
     </aside>
 
     <section id="middle">
       <header class="pane-header">
-        <input id="search-input" type="search" placeholder="Search all sessions…" autocomplete="off" />
+        <input id="search-input" type="search" data-i18n-placeholder="app.searchPlaceholder" placeholder="Search all sessions…" autocomplete="off" />
       </header>
       <ul id="session-list" class="scroll"></ul>
       <ul id="search-results" class="scroll hidden"></ul>
@@ -31,15 +26,69 @@
 
     <main id="detail">
       <header class="pane-header" id="detail-header">
-        <div id="detail-title" class="placeholder">Select a session</div>
-        <button id="resume-btn" class="hidden">▶ Resume</button>
+        <div id="detail-title" class="placeholder" data-i18n="app.selectSession">Select a session</div>
+        <button id="resume-btn" class="hidden" data-i18n="app.resume">▶ Resume</button>
       </header>
       <div id="timeline" class="scroll"></div>
     </main>
   </div>
+  <div id="settings-overlay" class="hidden">
+    <div id="settings-modal" role="dialog" aria-label="Settings">
+      <header class="settings-header">
+        <span data-i18n="settings.title">Settings</span>
+        <button id="settings-close" data-i18n-title="settings.close" title="Close">✕</button>
+      </header>
+      <div class="settings-body scroll">
+        <section class="settings-section">
+          <h3 data-i18n="settings.dataSources">Data sources</h3>
+          <p class="settings-note" data-i18n="settings.dataSourcesNote">
+            Where sessions are discovered. Agent stores are always read-only;
+            leave the root empty to use the default. Applies to the CLI too.
+          </p>
+          <div id="settings-providers"></div>
+        </section>
+        <section class="settings-section">
+          <h3 data-i18n="settings.resumeSection">Resume</h3>
+          <label class="settings-row">
+            <span class="settings-label" data-i18n="settings.terminal">Terminal</span>
+            <select id="terminal-select" data-i18n-title="settings.terminalTitle" title="Terminal used by Resume">
+              <option value="terminal">Terminal</option>
+              <option value="iterm2">iTerm2</option>
+              <option value="ghostty">Ghostty</option>
+              <option value="warp">Warp</option>
+            </select>
+          </label>
+          <p class="settings-note" data-i18n="settings.warpNote">
+            Warp can't run commands scriptably: VibeTrail opens the project and
+            copies the resume command to the clipboard instead.
+          </p>
+        </section>
+        <section class="settings-section">
+          <h3 data-i18n="settings.workspace">Workspace</h3>
+          <div id="settings-hidden"></div>
+        </section>
+        <section class="settings-section">
+          <h3 data-i18n="settings.language">Language</h3>
+          <label class="settings-row">
+            <span class="settings-label" data-i18n="settings.language">Language</span>
+            <select id="language-select">
+              <option value="auto" data-i18n="settings.languageAuto">Auto (system)</option>
+              <option value="en">English</option>
+              <option value="zh">中文</option>
+            </select>
+          </label>
+        </section>
+      </div>
+      <footer class="settings-footer">
+        <span id="config-path" data-i18n-title="settings.configTitle" title="Settings are stored as plain, hand-editable JSON"></span>
+        <button id="config-reveal" data-i18n="settings.reveal">Reveal in Finder</button>
+      </footer>
+    </div>
+  </div>
   <div id="toast" class="hidden"></div>
   <script src="vendor/marked.min.js"></script>
   <script src="vendor/purify.min.js"></script>
+  <script src="i18n.js"></script>
   <script src="main.js"></script>
 </body>
 </html>
