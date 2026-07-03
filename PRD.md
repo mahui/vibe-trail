@@ -41,6 +41,9 @@ macOS 上的 coding agent 重度用户(每天多个 session、多项目、可能
 | v1 | Claude Code | 全能力(浏览/搜索/resume) | ✅ |
 | v1.1 | Codex | 纯文件读取(含 .zst 解压),验证 Provider 抽象 | ✅ |
 | v1.2 | Antigravity | Experimental,仅读 brain/ 下 JSONL 部分;.pb/LanguageServer 依赖宿主进程,不做 | ✅ |
+| v1.3 | Cursor | Experimental,只读解析 IDE 的 state.vscdb(SQLite,见 TECH_SPEC ADR-7);resume = 打开 Cursor 客户端到项目,会话级直达待官方 deeplink;cursor-agent CLI 待样本 | 代码完成,待手测发布 |
+| v1.4 | Qoder | 全能力(浏览/搜索/resume `qodercli -r`),纯文件读取,存储布局类 CC(见 TECH_SPEC §4.5) | 代码完成,待手测发布 |
+| — | Trae | 不做:AI 会话存云端,本地仅输入历史,无数据可读(TECH_SPEC §4.x 调研结论,2026-07) | 关闭 |
 | 后续 | 社区贡献 | Provider 协议开放,接受 PR(见 CONTRIBUTING.md) | 开放 |
 
 原则:能纯文件读取就支持;需要宿主进程活着或逆向私有格式的,降级或不做,不为最弱的 provider 污染架构承诺。
@@ -71,6 +74,9 @@ macOS 上的 coding agent 重度用户(每天多个 session、多项目、可能
 - session id 展示与一键复制(列表短 id 芯片 + 详情完整 id 独立行)
 - 超长 tool 输出:预览 2000 字符 + 按需加载全文
 - 会话列表持续加载(50/页无限滚动);搜索结果点击不再关闭结果列表
+- 设置功能,按工程工具维度组织(TECH_SPEC §12):数据源(provider 开关 + 存储根覆盖 + 路径状态)/ Resume 终端 / 隐藏项目管理 / 配置文件出口(Reveal in Finder);发现配置下沉 Core,CLI 与 GUI 行为一致;新增 `vibetrail config [--json]` 检查生效配置
+- GUI 交互响应性("跟手")修复:Tauri command 全部移出主线程 + 壳层 SWR 缓存 + 启动预热,点击即时反馈(TECH_SPEC §7)
+- App 界面国际化:en/zh,设置面板切换(Auto/English/中文),偏好存 config.json;CLI 保持英文(TECH_SPEC §7)
 
 ### 非目标(v1 明确不做)
 

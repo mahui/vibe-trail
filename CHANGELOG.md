@@ -1,5 +1,68 @@
 # Changelog
 
+## Unreleased
+
+### Providers
+
+- **Cursor** (experimental) — reads the IDE-side session store
+  (`state.vscdb`, SQLite opened strictly read-only; ADR-7) with both composer
+  generations supported (legacy inline conversations and the current
+  bubble-store format). Projects derive from the workspace mapping; search
+  goes through the provider-internal degrade path (parallel per composer).
+  Resume opens the Cursor app at the project (new `LaunchMode::GuiApp` —
+  no public deep link to a specific past chat exists yet).
+- **Qoder** — full capability. Session pairs (`<id>-session.json` +
+  `<id>.jsonl`) under `~/.qoder/projects/**`; metadata gives titles, token
+  usage and resume/fork chain parents for free; subagent Task sessions fold
+  under their root session. Full-text search runs on the grep engine; resume
+  via `qodercli -r`.
+- **Trae** — investigated and closed: AI sessions are stored server-side
+  (only an input history exists locally), so there is nothing a file-based
+  provider could read.
+
+### App responsiveness
+
+- Every store-touching Tauri command moved off the main thread
+  (`async` + `spawn_blocking`) — clicks, hover and scrolling no longer freeze
+  while a discovery or search runs.
+- Stale-while-revalidate session cache in the frontend: clicking a project
+  renders the last-seen list instantly and refreshes in the background; a
+  startup warm-up (one whole-store discovery) makes even first clicks
+  instant. Summaries are cached per `id@mtime`, so only changed sessions
+  re-parse. Presentation-layer memory only — the backend stays stateless.
+- Timeline render chunk reduced 200 → 80 messages per frame; slow loads
+  (>150ms) show an explicit loading state; project/session/search fetches
+  are generation-guarded against superseded clicks.
+
+### UI
+
+- Distinct badge colors for all five providers (Cursor purple, Qoder amber) —
+  previously both fell back to the same gray.
+- Interface internationalization: English and 中文, hand-rolled dictionary
+  (no build chain). Language setting in the settings pane — Auto (system) /
+  English / 中文 — persisted in config.json; the native "Settings…" menu item
+  localizes on an explicit choice. Backend-produced messages (errors, resume
+  notes) remain English.
+
+### Settings
+
+- Native menu-bar entry: "Settings…" (⌘,) in the app menu, inserted at the
+  standard macOS position; the sidebar ⚙ button remains as an in-window
+  mirror.
+- Settings pane (⚙ in the sidebar) organized along engineering-tool
+  dimensions: **Data sources** (per-provider enable switch and store-root
+  override with live path validation), **Resume** (terminal choice, moved out
+  of the sidebar), **Workspace** (hidden-project management), and the config
+  file itself (path + Reveal in Finder).
+- Config stays a single hand-editable JSON file
+  (`~/.config/vibetrail/config.json`); unknown keys survive save round-trips,
+  and a missing or broken file degrades to defaults.
+- Provider discovery settings are honored by the CLI and the GUI alike:
+  both shells now build their store from the same config (core-owned).
+- New `vibetrail config [--json]` command prints the effective
+  configuration — config path plus each provider's enabled state, effective
+  root, and whether the root exists; the JSON shape is snapshot-pinned.
+
 ## 0.1.0 — 2026-07-02
 
 Initial release: browse, search, and resume coding-agent sessions across

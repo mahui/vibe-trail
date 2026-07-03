@@ -17,7 +17,9 @@ vibetrail/                        # Cargo workspace
 │   │   ├── src/providers/
 │   │   │   ├── claude_code/      # v1
 │   │   │   ├── codex/            # v1.1
-│   │   │   └── antigravity/      # v1.2, experimental
+│   │   │   ├── antigravity/      # v1.2, experimental
+│   │   │   ├── cursor/           # v1.3, experimental(SQLite 只读,ADR-7)
+│   │   │   └── qoder/            # v1.4
 │   │   └── tests/                # 各 provider fixture 对拍
 │   └── vibetrail-cli/            # CLI 薄壳(clap)
 └── apps/
@@ -55,6 +57,7 @@ vibetrail/                        # Cargo workspace
 **CLI:** 校验路径后 `chdir` 到项目路径并 `exec` provider 给出的 resume 命令(Unix `CommandExt::exec`)。
 **GUI:** Tauri 后端(Rust)按用户配置的终端拉起执行(P1 已交付,配置在 `~/.config/vibetrail/config.json`):Terminal.app / iTerm2 经 `osascript` 直接执行;Warp 无可脚本化的"执行命令"面,降级为打开项目目录 + resume 命令入剪贴板并提示用户粘贴。
 **Ghostty 教训(2026-07):** 其 AppleScript 字典(1.3)是官方声明的 preview——实测连续 resume 会把 Ghostty 驱动到崩溃,已撤回依赖。现行为:未运行 → `open -a`(不带 `-n`)冷启动传参,单实例无重复图标,命令尾接 `exec $SHELL` 保持交互;已运行 → **NSPerformService 触发其 Finder service "New Ghostty Tab Here"**(Info.plist NSServices/openTab——Finder 级成熟 handler,经 JXA 桥调用,零 AppleEvent 零 TCC),在项目目录开好新 tab + resume 命令入剪贴板,用户仅剩粘贴回车;service 不可用时退回激活+剪贴板。等 Ghostty 1.4 scripting 稳定后再评估全自动执行。禁止用 `open -n`(每次 resume 多一个 Dock 图标)、System Events keystroke(需辅助功能权限,且中文输入法下键击注入乱码)与 preview scripting 字典。
+**客户端 App 形态(2026-07,Cursor):** resume 目标不总是终端命令——Cursor 的会话属于其 GUI 客户端,"resume"语义是打开 Cursor 到对应项目窗口、由用户在聊天历史面板回到会话。`ResumeSpec` 增加启动模式 `launch: Terminal | GuiApp`(默认 Terminal,既有 provider 行为不变):GuiApp 不经终端配置,两壳直接 detached spawn 命令(CLI spawn 后退出 0;GUI 不走 osascript/终端链路),Cursor 的命令即 `["open", "-a", "Cursor", "<project_path>"]`(单实例,同窗口复用,无重复 Dock 图标问题)。会话级直达无公开接口(官方 deeplink 仅 prompt 预填与 MCP 安装,"链接历史会话"在官方论坛仍是 feature request),resume 时 UI 展示会话标题辅助用户在 Cursor 历史面板定位;将来官方提供 composer deeplink 再升级直达。
 **安全:** 无网络监听面;AppleScript 需 Automation 权限,首次触发引导授权。config.json 是 VibeTrail 唯一写入的文件,agent 存储目录仍严格只读。
 
 ### ADR-5:License 与开源结构
@@ -68,6 +71,13 @@ vibetrail/                        # Cargo workspace
 **状态:** 已接受
 **原则:** 只接纳纯文件读取可覆盖的能力。需要宿主进程存活(如 Antigravity LanguageServer API)或逆向无 schema 私有格式(.pb)的能力一律不做或降级,不为最弱 provider 污染"零依赖活读"的架构承诺。
 **纪律:** 抽象第一天建立,但 v1 只 ship Claude Code 一个实现;Codex(v1.1)的用途是验证抽象切分是否正确——单实现的抽象是猜测,两个实现才算数。
+
+### ADR-7:SQLite 只读读取准入(Cursor)
+
+**状态:** 已接受(2026-07)
+**背景:** Cursor IDE 的会话存储是 SQLite(state.vscdb)内嵌 JSON,不是 JSONL 平文件。
+**决定:** ADR-6"纯文件读取"的判据是**不需要宿主进程存活、格式可稳定解析**,而非文件后缀。SQLite 是有公开规范的开放文件格式,只读打开与读 JSONL 性质相同,准入。ADR-2 / 铁律里的"无数据库"约束的是 VibeTrail 不自建存储与索引;provider 自身恰好用 SQLite 存数据,只读解析它不在此列。
+**代价与边界:** Core 引入 `rusqlite`(bundled 静态链接,无外部依赖,许可兼容 Apache-2.0)。只读纪律见 §4.4。逆向无 schema 私有格式(.pb)与宿主进程 API 依赖仍然拒收——ADR-6 原则不变,本条只澄清边界。
 
 ## 3. Provider 协议
 
@@ -91,10 +101,10 @@ pub trait Provider: Send + Sync {
 }
 
 pub struct ProviderCapabilities {
-    pub resumable: bool,        // CC ✓ / Codex ✓ / AGY ✗
-    pub file_based_only: bool,  // CC ✓ / Codex ✓ / AGY 部分
+    pub resumable: bool,        // CC ✓ / Codex ✓ / AGY ✗ / Cursor ✓(客户端级,见 ADR-4)
+    pub file_based_only: bool,  // CC ✓ / Codex ✓ / AGY 部分 / Cursor ✓(SQLite,ADR-7)
     pub has_artifacts: bool,    // AGY ✓(plan/task/walkthrough)
-    pub project_native: bool,   // CC ✓ / Codex ✗(按日期) / AGY ✗(按 conversation)
+    pub project_native: bool,   // CC ✓ / Codex ✗(按日期) / AGY ✗(按 conversation) / Cursor ✗(按 workspace 映射)
 }
 ```
 
@@ -155,6 +165,55 @@ entry 解析 → 分类过滤 → 消息重组 → 树重建 → 展示转换
 **不支持:** IDE 侧 `.pb` protobuf 会话与 LanguageServer API 读取(需宿主进程存活,违反 ADR-6)。
 **capabilities:** resumable=false,hasArtifacts=true。UI 明确标注 experimental 与覆盖范围。
 
+### 4.4 Cursor(v1.3,experimental)
+
+**存储(macOS,本机 2026-07 实测):** 会话在 Cursor IDE 的 VS Code 派生存储中,SQLite 内嵌 JSON:
+
+```
+~/Library/Application Support/Cursor/User/
+├── globalStorage/state.vscdb              # cursorDiskKV 表(本机 1.8GB)
+│   ├── composerData:<composerId>          # 会话头(本机 416 个)
+│   └── bubbleId:<composerId>:<bubbleId>   # 消息正文(本机 3.5 万条)
+└── workspaceStorage/<hash>/
+    ├── workspace.json                     # folder URI → 真实项目路径
+    └── state.vscdb                        # ItemTable 键 composer.composerData
+                                           #   → 该 workspace 的 allComposers 元数据列表
+```
+
+**发现(两级走查,不碰大库正文):** 枚举 workspaceStorage → `workspace.json` 取项目路径(项目分组派生源,file URI 需解码归一化)→ 该 workspace 小库的 `allComposers` 取 composerId/createdAt/mode。无 workspace 归属的 composer(已删 workspace 的孤儿)忽略 + debug 计数,后续再评估归置。native_id = composerId;RawSession.mtime 取 composer 元数据时间戳(共享单库,文件 mtime 无会话区分度)。
+
+**解析:** globalStorage 点查 `composerData:<id>`。**两代格式必须都支持:** 旧版 `conversation` 数组内嵌 bubble 全文;新版(`_v` ≥ 3)仅 `fullConversationHeadersOnly` 存 bubbleId 序列,正文逐条点查 `bubbleId:<composerId>:<bubbleId>`。bubble `type` 1=user / 2=assistant;字段白名单:text、thinking、tool call/result、tokenCount;未知字段/类型忽略 + 计数。会话线性,无 CC 树、无跨文件重复(CC 四规则不适用,勿套)。
+
+**SQLite 纪律(ADR-7):** `rusqlite` bundled,`mode=ro` 打开 + busy_timeout(Cursor 运行中持续写库,WAL);**禁用 `immutable=1`**(文件在变,会读到损坏页);禁一切写与 WAL checkpoint。discover/parse 全部走主键点查与 `bubbleId:<composerId>:` 前缀范围查询,禁止对 1.8GB 大库全表扫描。
+
+**搜索:** ripgrep 引擎无法作用于 SQLite → `search_roots` 返回空,覆写 `search_compressed`(ADR-3 降级路径):按 scope 内 composer 的 bubble 前缀范围查询遍历匹配,messageUuid 锚点用 bubbleId;composer 级 rayon 并行,每任务独立只读连接(SQLite 并发只读安全)。实测(本机 416 composer / 3.5 万 bubble / 1.8GB 库,release):全库 1.4s,项目内 0.8s,混合全局搜索维持在原 2.2s 地板附近。
+
+**Resume(客户端形态,见 ADR-4 增补):** `launch=GuiApp`,命令 `open -a Cursor <project_path>`;会话级直达无公开 deeplink,UI 展示会话标题辅助用户在 Cursor 聊天历史面板定位。
+**capabilities:** resumable=true(客户端级)、has_artifacts=false、project_native=false。
+**不支持(当前):** cursor-agent CLI 会话——本机无样本、格式未验证,`~/.cursor/projects/<encoded-path>/` 仅见 terminals/rules/mcps 无会话正文;待有真实样本再评估,不阻塞 IDE 侧。
+
+### 4.5 Qoder(v1.4)
+
+**存储:** `~/.qoder/projects/<encoded-project-path>/`,布局神似 CC 但契约更友好——**一个顶层会话 = 一对文件**:
+
+```
+<session-id>-session.json    # 元数据:title、working_dir(权威 cwd,无需目录名解码)、
+                             #   parent_session_id(链父)、prompt/completion_tokens、cost、时间戳
+<session-id>.jsonl           # 线性正文,每行一条消息
+```
+
+同目录的其他内容不是会话:无 `-session.json` 配对的 `toolu_*.jsonl`(tool 中间产物)与 `<session-id>/` checkpoint 快照目录,发现与搜索均排除。**注意:** 带 `-session.json` 配对的 `toolu_*` 是 subagent Task 会话(title "Task: …"、parent_session_id 指向父)——正常枚举,经 parent 链机制自动折叠到父会话下,无需特判。
+
+**解析(线性,CC 四规则不适用):** 每行 `{id, session_id, role, parts[], created_at(ms), is_meta}`。`is_meta` 行过滤 + 计数;role 白名单 user/assistant/tool(tool 行承载 tool_result,按 assistant 侧展示),未知 role 忽略 + 计数;parts 白名单:`text`、`tool_call`(input 为 JSON 编码字符串,解码展示)、`tool_result`(content 可为字符串或嵌套块,收集字符串叶)、`finish`(已知终止标记,不展示),未知 type 忽略 + 计数。消息 uuid = 行 `id`。token 统计直接取 session.json(无需 CC 式去重累加),extensions.usage 与 CC 同 shape。
+**搜索:** 纯 JSONL 直接进 ripgrep 引擎;项目 scope 按目录首个 session.json 的 working_dir 收窄(同 CC 模式);resolve_hit 要求 `.jsonl` + 存在配对元数据,天然排除 checkpoint 与孤儿 toolu 文件。
+**Resume:** `qodercli -r <session-id>`(先 cd 到项目路径;Terminal 形态,同 CC/Codex)。
+**链信号:** session.json 的 `parent_session_id` 即链父,发现时零额外 IO。
+**capabilities:** resumable=true、file_based_only=true、has_artifacts=false、project_native=true。
+
+### 4.x Trae(调研结论:不做)
+
+2026-07 实测(Trae 2.x):AI 会话不落本地盘——`state.vscdb` 仅存输入历史(`icube-ai-agent-storage-input-history`)与模型配置,IndexedDB 仅 20KB 无会话内容,会话正文存字节云端(账号同步)。无本地数据可读,连降级读取的对象都不存在,ADR-6 直接不适用。若 Trae 未来引入本地会话存储再评估。
+
 ## 5. Core 统一模型与服务
 
 ```rust
@@ -182,6 +241,7 @@ vibetrail search <query> [-p <project>] [--provider <id>] [--json]
 vibetrail show <session-id> [--outline|--full] [--json]     # 默认 outline
 vibetrail resume <session-id>
 vibetrail open [<project>]                                  # 拉起 GUI
+vibetrail config [--json]                                   # 生效配置(§12)
 ```
 
 - `--json` schema 在 Core 定义(Codable),GUI/CLI 共用;这是未来 MCP server 的接口雏形。
@@ -194,12 +254,25 @@ Tauri v2:Rust 薄壳注册 commands(`list_projects` / `list_sessions` / `get_ses
 
 ```
 三栏布局(ui/)
-├── Sidebar: 项目列表(F1,provider 徽标聚合)
+├── Sidebar: 项目列表(F1,provider 徽标聚合,可隐藏项目)
 ├── Middle:  会话列表(F2)+ 顶栏搜索(F4,覆盖层结果)
 └── Detail:  时间线(F3)+ Resume 按钮(F5,按 capability 显隐)
 ```
 
 tool call / result / thinking 折叠为单行摘要,点击展开;超长 tool result 截断 + "展开全文";搜索结果点击 → 详情页 `scrollTo(messageUuid)`。
+
+**项目隐藏:** 纯 GUI 展示偏好——行内 ⊘ 隐藏、列表底部 "N hidden projects" 折叠区内 ↩ 取消隐藏。条目存 `config.json` 的 `hiddenProjects`,可为字面路径(normalized real path)或 glob 通配符(`*` 段内、`**` 跨段、`?` 单字符;不含 `/` 的条目按项目名匹配,gitignore 式),通配符条目经设置面板 Workspace 区输入。行内 ↩ 移除命中该项目的全部条目,连带移除通配符时 toast 告知;设置面板按条目逐条管理并显示每个 pattern 的命中数。Core 发现、搜索与 CLI 输出不受影响,不引入新的存储或索引。
+
+**设置面板:** 主入口为原生菜单栏 App 菜单的 "Settings…"(⌘,,macOS 标准位置,About 之后;在 Tauri 默认菜单上插入,菜单事件经 `open-settings` 事件通知前端),侧栏 ⚙ 为窗口内镜像入口。分组与 schema 见 §12;对应 commands `settings_info`(生效配置报告,与 CLI `config --json` 同 schema)与 `reveal_config`(Finder 定位配置文件)。
+
+**交互响应性(2026-07,"跟手"修复),两条纪律:**
+1. **主线程零阻塞。** Tauri 同步 command 在主线程执行,任何 store 触达(活读,本机规模秒级)都会冻住渲染、hover 与点击——这是卡顿的根源。所有做 IO/spawn 子进程的 command 一律 `async fn` + `spawn_blocking`,禁止新增同步耗时 command。
+2. **壳层 SWR 缓存。** 点击项目立即渲染上次结果、后台活读校验后差异替换(handles 按项目路径、summary 按 `provider:id@mtime` 键控,mtime 变化即自然失效);启动时 `list_all_handles` 一次全店发现预热缓存——项目总览本就付过这次读,此前把 handles 丢弃了。缓存只活在窗口内存,数据源设置变更即清空,活读仍是唯一真相源:ADR-2 的"无索引、无缓存"约束 Core 与持久层,不约束展示层内存。
+   另:时间线渲染块 200→80 条/帧(整块 markdown 解析会卡帧);慢加载(>150ms)才显示 loading 态,快路径不闪烁;项目/会话/搜索均有 generation 竞态防护,后发请求胜出。
+
+**国际化(2026-07):** 前端手写 i18n(`ui/i18n.js`),en/zh 双字典 + `t(key, params)`,静态文本经 `data-i18n(-title/-placeholder)` 属性填充——零依赖零构建链(ADR-1 前端纪律不破)。语言偏好存 config.json `language`("auto"|"en"|"zh",auto 由前端按 `navigator.language` 解析);设置面板切换后保存并 reload(低频操作,reload 比全视图原地重渲染简单可靠)。原生菜单 "Settings…" 仅在显式选 zh 时本地化(原生层无廉价 locale 探测,不为此引插件)。**边界:** 后端(Rust)产生的错误消息与 resume 提示保持英文,不跨 IPC 做消息本地化;provider 名称与键名等专有名词不翻译。
+
+**徽标配色:** 五个已知 provider 各占一个可辨识色相(CC 砖红/CX 绿/AG 蓝/CU 紫/QD 琥珀),未知 provider 回落灰色;全部中性色,不使用厂商品牌色(开源卫生)。
 
 **图标纪律:** 图标源图必须遵守 Apple 图标网格——内容(squircle)占画布 824/1024(80.5%),四边各留 ~9.8% 透明边距,圆角半径 22.5%。满幅填充的图标在 macOS(尤其 15+)的 Dock 里会比系统图标大一圈。`bundle.icon` 与运行时 Dock 图标共用 `icons/icon.png`,换图时先量 bbox 再提交。
 
@@ -216,7 +289,7 @@ tool call / result / thinking 折叠为单行摘要,点击展开;超长 tool res
 
 ## 9. 测试策略
 
-- **per-provider fixture 对拍:** 每个 provider 收集真实样本(CC:流式多行、branching 重复 UUID、subagent、未知类型;Codex:zst、session_meta 变体),断言消息数、tool call 数与人工核对值一致。这是格式漂移的回归防线。
+- **per-provider fixture 对拍:** 每个 provider 收集真实样本(CC:流式多行、branching 重复 UUID、subagent、未知类型;Codex:zst、session_meta 变体;Cursor:从真实 state.vscdb 抽样脱敏构造 mini vscdb,覆盖新旧两代 composerData 与孤儿 composer),断言消息数、tool call 数与人工核对值一致。这是格式漂移的回归防线。
 - CC 解析层单测覆盖四条规则各自的反例输出。
 - `--json` schema 快照测试。
 - GUI 手测,v1 不做 UI 自动化。
@@ -230,6 +303,8 @@ tool call / result / thinking 折叠为单行摘要,点击展开;超长 tool res
 | M3 | GUI 三视图 + 搜索 + Resume | PRD P0 闭环,开源发布 v1 | ✅ |
 | M4 | Codex provider | 抽象验证通过(无需改协议或改动极小),发布 v1.1 | ✅(trait 增加 line_number/search_compressed 两处,详见 §3) |
 | M5 | Antigravity provider(experimental)、P1 项 | v1.2 | ✅(P1 token 统计不含 cost 换算——定价表随模型漂移,只做 token) |
+| M6 | Cursor provider(experimental)+ ResumeSpec 客户端形态(ADR-7、§4.4) | fixture 对拍 + 真机 resume 手测,发布 v1.3 | 代码完成,fixture 对拍与真实库 smoke 通过;GUI/resume 手测待用户验证 |
+| M7 | Qoder provider(§4.5);Trae 调研结论:云端存储无本地数据,不做 | fixture 对拍 + 真机 resume 手测,发布 v1.4 | 代码完成,fixture 对拍与真实库 smoke 通过;resume 手测待用户验证 |
 
 M1/M2 先行:CLI 是 Core 的测试驱动器,GUI 只是换皮。
 
@@ -240,3 +315,34 @@ M1/M2 先行:CLI 是 Core 的测试驱动器,GUI 只是换皮。
 - 对所有 agent 存储目录严格只读。
 - 未知 entry/格式变体:忽略 + 计数,禁止抛错中断。
 - 所有路径操作先校验存在性;错误信息含具体文件路径。
+
+## 12. 配置与设置
+
+**原则:配置即文件。** `~/.config/vibetrail/config.json` 是设置的唯一事实源,也仍是 VibeTrail 唯一写入的文件(ADR-4 不变):纯 JSON、可手编、可进 dotfiles。GUI 设置面板只是它的薄编辑器;保存时本版本不认识的字段原样保留(手编内容与更新版本的字段不被打掉)。缺失或损坏的配置一律降级为默认值——配置错误绝不允许 brick 发现流程。
+
+**schema(App 壳持有全量,Core 只读 `providers` 切片):**
+
+```json
+{
+  "terminal": "terminal | iterm2 | ghostty | warp",
+  "hiddenProjects": ["/abs/normalized/path", "**/scratch/**", "tmp-*"],
+  "providers": {
+    "claude-code": { "enabled": true },
+    "codex":       { "enabled": true, "root": "~/alt/codex/sessions" },
+    "antigravity": { "enabled": false }
+  }
+}
+```
+
+**发现配置下沉 Core。** provider 启用与存储根覆盖决定 `SessionStore` 的构成,属发现逻辑,实现在 `vibetrail-core::config`(静态 provider 注册表 + `store_from_config`);CLI 与 GUI 均经 `default_store()` 建店,同一份配置在两个壳行为一致。`enabled=false` 的 provider 不参与发现、搜索与 resume;`root` 支持 `~`,空串等价缺省;省略的 provider 取 `{enabled: true, root: 默认}`。写入仍只发生在 GUI 壳,Core 对配置文件只读。
+
+**设置面板按工程工具维度分组(而非杂项开关堆):**
+
+| 维度 | 内容 | 类比 |
+|------|------|------|
+| Data sources | 各 provider 启用开关、存储根覆盖(占位符即默认路径)、路径有效性状态(found / missing / disabled) | IDE 的 SDK/toolchain 配置 |
+| Resume | 终端选择(含 Warp 降级说明) | 运行/工作流配置 |
+| Workspace | 隐藏项目集中管理(查看、Unhide) | 工作区视图配置 |
+| 配置文件 | 底部常驻:config.json 路径 + Reveal in Finder | "配置即文件"的出口 |
+
+**可检查性。** `vibetrail config [--json]` 输出生效配置:配置文件路径,以及每个 provider 的 enabled、生效 root、默认 root、是否自定义、路径是否存在。`--json` schema(`ConfigReport` / `ProviderStatus`)在 Core 定义、有快照测试,与 GUI `settings_info` command 共用——设置没有第二套数据通道。

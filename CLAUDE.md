@@ -11,8 +11,8 @@
 - 一份 Core(`vibetrail-core`)+ 两个薄壳(CLI `vibetrail-cli` / Tauri App)+ N 个 Provider。业务逻辑只许在 Core,壳层发现逻辑必须下沉。
 - Core 不依赖 tauri/任何 GUI crate;壳层不直接碰任何 agent 存储目录。Tauri 前端保持纯静态 HTML/CSS/JS,不引入 Node 构建链。
 - Provider 之间零依赖;provider 特有逻辑禁止泄漏到 Core 通用层。项目分组是从 cwd 派生的,不是存储属性。
-- 无数据库、无索引、无常驻进程、无 FS watcher。搜索 link ripgrep 引擎 crates(grep-searcher/grep-regex),无外部 rg 依赖。
-- Provider 现状:ClaudeCode(v1)/Codex(v1.1)/Antigravity(v1.2, experimental)均已实现;Provider trait 与 capabilities 见 TECH_SPEC 第 3 节。新 provider 准入守 ADR-6(纯文件读取)。
+- 无数据库、无索引、无常驻进程、无 FS watcher——指不自建存储;只读解析 provider 自身的 SQLite(Cursor)准入见 ADR-7。搜索 link ripgrep 引擎 crates(grep-searcher/grep-regex),无外部 rg 依赖。
+- Provider 现状:ClaudeCode(v1)/Codex(v1.1)/Antigravity(v1.2, experimental)/Cursor(v1.3, experimental, SQLite 只读见 ADR-7 与 TECH_SPEC §4.4)/Qoder(v1.4, 全能力见 §4.5)均已实现;Trae 不做(会话存云端无本地数据,§4.x)。Provider trait 与 capabilities 见 TECH_SPEC 第 3 节。新 provider 准入守 ADR-6(纯文件读取)。
 
 ## Claude Code Provider 解析四规则(违反即 bug)
 
@@ -23,7 +23,7 @@
 
 ## 安全约定
 
-- 对 `~/.claude`、`~/.codex`、`~/.gemini` 等 agent 目录严格只读。
+- 对 `~/.claude`、`~/.codex`、`~/.gemini`、`~/.cursor`、`~/.qoder`、`~/Library/Application Support/Cursor` 等 agent 目录严格只读;Cursor 的 SQLite 只许 `mode=ro` 打开,禁写、禁 WAL checkpoint、禁 `immutable=1`。
 - resume 前必须校验项目真实路径存在。
 
 ## 工作流

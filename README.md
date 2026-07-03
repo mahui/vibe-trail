@@ -59,6 +59,8 @@ closes the loop: **browse → search → resume**.
   Ghostty, or Warp, in the right directory, with the right agent command.
 - **Scriptable** — every query command takes `--json` with a stable,
   snapshot-tested schema.
+- **Localized** — the app speaks English and 中文 (auto-detected, switchable
+  in Settings).
 
 <p align="center">
   <img src="assets/screenshot-artifacts.png" alt="Antigravity session with artifacts, agent badges, and resume chains" width="880" />
@@ -71,6 +73,8 @@ closes the loop: **browse → search → resume**.
 | Claude Code | ✅ | browse / search / resume, subagent view, token stats |
 | Codex | ✅ | browse / search / resume, incl. `.jsonl.zst` |
 | Antigravity | ✅ experimental | browse / search / artifacts (no resume) |
+| Cursor | ✅ experimental | browse / search / resume (opens the Cursor app at the project) |
+| Qoder | ✅ | browse / search / resume (`qodercli -r`), subagent task chains |
 
 ## Install
 
