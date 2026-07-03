@@ -274,6 +274,8 @@ tool call / result / thinking 折叠为单行摘要,点击展开;超长 tool res
 
 **徽标配色:** 五个已知 provider 各占一个可辨识色相(CC 砖红/CX 绿/AG 蓝/CU 紫/QD 琥珀),未知 provider 回落灰色;全部中性色,不使用厂商品牌色(开源卫生)。
 
+**自更新(2026-07,tauri-plugin-updater):** manifest 为 GitHub release 的 `latest.json`(endpoint `releases/latest/download`),更新包 minisign 验签(公钥在 tauri.conf.json)+ Apple 签名公证双重保障。交互纪律:**永不静默安装**——启动 5s 后后台静默检查(离线失败静默吞掉),发现新版展示持久横幅,用户点击才下载安装并重启;设置面板有手动检查与当前版本号。签名私钥在 GitHub secrets(`TAURI_SIGNING_PRIVATE_KEY`)与发布者本机 `~/.tauri/vibetrail-updater.key`——**丢失即所有已装 app 永远无法再验证更新,必须备份**。安全边界澄清:更新检查是 app 唯一的主动出站请求(GitHub,仅版本查询);自更新替换应用包自身是该功能的本质,"config.json 是唯一写入文件"的约定指用户数据面,不含 app 自身的原子替换。CI 侧 tauri-action 注入签名 env 并以 `includeUpdaterJson` 上传 manifest。
+
 **图标纪律:** 图标源图必须遵守 Apple 图标网格——内容(squircle)占画布 824/1024(80.5%),四边各留 ~9.8% 透明边距,圆角半径 22.5%。满幅填充的图标在 macOS(尤其 15+)的 Dock 里会比系统图标大一圈。`bundle.icon` 与运行时 Dock 图标共用 `icons/icon.png`,换图时先量 bbox 再提交。
 
 ## 8. 性能预算

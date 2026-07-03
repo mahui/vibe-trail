@@ -6,6 +6,14 @@
   "build": {
     "frontendDist": "../ui"
   },
+  "plugins": {
+    "updater": {
+      "endpoints": [
+        "https://github.com/mahui/vibe-trail/releases/latest/download/latest.json"
+      ],
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDZBOUMzQjMxNTU2OUM3OApSV1I0bkZZVnM4T3BCZ0VhZWh6STBDTThqRWgwcE9SMG5jT245ejhTdk5JcVpGVzdxRE1USkp2UAo="
+    }
+  },
   "app": {
     "withGlobalTauri": true,
     "windows": [
@@ -23,6 +31,7 @@
   },
   "bundle": {
     "active": true,
+    "createUpdaterArtifacts": true,
     "targets": [
       "app",
       "dmg"

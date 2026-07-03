@@ -75,6 +75,10 @@ const I18N = (() => {
       "settings.unhide": "Unhide",
       "settings.hidePlaceholder":
         "Hide by path or pattern, e.g. **/scratch/** or tmp-*",
+      "settings.checkUpdates": "Check for updates",
+      "update.available": "VibeTrail {version} is available — click to update",
+      "update.installing": "Downloading update… the app will relaunch",
+      "update.none": "You're on the latest version.",
     },
     zh: {
       "app.projects": "项目",
@@ -140,6 +144,10 @@ const I18N = (() => {
       "settings.matches": "命中 {n} 个",
       "settings.unhide": "取消隐藏",
       "settings.hidePlaceholder": "按路径或通配符隐藏，例如 **/scratch/** 或 tmp-*",
+      "settings.checkUpdates": "检查更新",
+      "update.available": "VibeTrail {version} 已发布——点击更新",
+      "update.installing": "正在下载更新…完成后将自动重启",
+      "update.none": "已是最新版本。",
     },
   };
 

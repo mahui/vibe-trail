@@ -266,6 +266,26 @@ details.thinking summary { color: var(--thinking); }
 
 #toast.info { background: #1d4ed8; }
 
+/* Update banner: persistent (unlike toasts) and clickable — an update is an
+   invitation, never a silent install. */
+#update-banner {
+  position: fixed;
+  bottom: 18px;
+  right: 18px;
+  background: #0f8a4d;
+  color: #fff;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-weight: 500;
+  max-width: 40vw;
+  z-index: 11;
+  cursor: pointer;
+}
+#update-banner:hover { filter: brightness(1.1); }
+#update-banner.busy { cursor: default; opacity: 0.85; }
+
+#app-version { color: var(--text-dim); font-size: 11px; white-space: nowrap; }
+
 #terminal-select {
   font: inherit;
   font-size: 12px;

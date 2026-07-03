@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+- Self-update: the app checks GitHub Releases in the background after boot
+  and shows a persistent banner when a new version is available — installs
+  only on click, never silently, then relaunches. Manual check plus the
+  current version live in Settings. Update packages are minisign-verified
+  on top of Apple's signing and notarization. (Requires installing this
+  version manually once; earlier versions have no updater.)
+
 ## 0.3.0 — 2026-07-03
 
 - Sidebar project filter: live name search plus per-agent badge toggles.

@@ -24,6 +24,9 @@ const el = {
   settingsHidden: document.getElementById("settings-hidden"),
   configPath: document.getElementById("config-path"),
   configReveal: document.getElementById("config-reveal"),
+  updateBanner: document.getElementById("update-banner"),
+  appVersion: document.getElementById("app-version"),
+  checkUpdates: document.getElementById("check-updates"),
 };
 
 const state = {
@@ -1010,6 +1013,47 @@ async function initConfig() {
 function saveConfig() {
   return call("set_config", { config: state.config });
 }
+
+// ---- self-update ---------------------------------------------------------------
+// Background check a few seconds after boot; a persistent banner invites the
+// install (never silent). Settings has a manual check for the impatient.
+
+let updateInstalling = false;
+
+function showUpdateBanner(version) {
+  el.updateBanner.textContent = t("update.available", { version });
+  el.updateBanner.classList.remove("hidden", "busy");
+  el.updateBanner.onclick = async () => {
+    if (updateInstalling) return;
+    updateInstalling = true;
+    el.updateBanner.classList.add("busy");
+    el.updateBanner.textContent = t("update.installing");
+    try {
+      await invoke("install_update"); // relaunches on success
+    } catch (error) {
+      updateInstalling = false;
+      el.updateBanner.classList.add("hidden");
+      toast(String(error));
+    }
+  };
+}
+
+async function checkForUpdates(manual = false) {
+  try {
+    const version = await invoke("check_update");
+    if (version) showUpdateBanner(version);
+    else if (manual) toast(t("update.none"), true);
+  } catch (error) {
+    // Boot-time checks fail quietly (offline is normal); manual ones report.
+    if (manual) toast(String(error));
+  }
+}
+
+el.checkUpdates.addEventListener("click", () => checkForUpdates(true));
+invoke("app_version")
+  .then((v) => { el.appVersion.textContent = `v${v}`; })
+  .catch(() => {});
+setTimeout(checkForUpdates, 5000);
 
 // Surface runtime errors — a silent exception reads as "clicks do nothing".
 window.addEventListener("error", (event) => {

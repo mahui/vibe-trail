@@ -183,6 +183,42 @@ async fn copy_to_clipboard(text: String) -> Result<(), String> {
     .await
 }
 
+/// Self-update (tauri-plugin-updater): manifest is `latest.json` on the
+/// GitHub release, artifacts are minisign-verified against the pubkey in
+/// tauri.conf.json. The frontend drives the flow — a background check on
+/// boot and a manual check in Settings; installs never happen silently.
+#[tauri::command]
+async fn check_update(app: tauri::AppHandle) -> Result<Option<String>, String> {
+    use tauri_plugin_updater::UpdaterExt;
+    let updater = app.updater().map_err(|e| e.to_string())?;
+    match updater.check().await {
+        Ok(Some(update)) => Ok(Some(update.version.clone())),
+        Ok(None) => Ok(None),
+        Err(e) => Err(e.to_string()),
+    }
+}
+
+#[tauri::command]
+async fn install_update(app: tauri::AppHandle) -> Result<(), String> {
+    use tauri_plugin_updater::UpdaterExt;
+    let updater = app.updater().map_err(|e| e.to_string())?;
+    let update = updater
+        .check()
+        .await
+        .map_err(|e| e.to_string())?
+        .ok_or("No update available")?;
+    update
+        .download_and_install(|_, _| {}, || {})
+        .await
+        .map_err(|e| e.to_string())?;
+    app.restart();
+}
+
+#[tauri::command]
+fn app_version(app: tauri::AppHandle) -> String {
+    app.package_info().version.to_string()
+}
+
 #[tauri::command]
 fn get_config() -> config::AppConfig {
     config::load()
@@ -260,6 +296,7 @@ fn install_menu(app: &tauri::App) -> tauri::Result<()> {
 
 fn main() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
             install_menu(app)?;
             Ok(())
@@ -280,6 +317,9 @@ fn main() {
             set_config,
             settings_info,
             reveal_config,
+            check_update,
+            install_update,
+            app_version,
         ])
         .run(tauri::generate_context!())
         .expect("error while running VibeTrail");

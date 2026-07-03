@@ -33,6 +33,10 @@ jobs:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          # Self-update artifact signing (minisign). Losing this key means
+          # shipped apps can never verify another update — keep it backed up.
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           projectPath: apps/vibetrail-app
           args: --target universal-apple-darwin
@@ -40,6 +44,9 @@ jobs:
           releaseName: VibeTrail ${{ github.ref_name }}
           releaseBody: See CHANGELOG.md for details.
           releaseDraft: true
+          # Upload latest.json so shipped apps discover this release through
+          # the updater endpoint (releases/latest/download/latest.json).
+          includeUpdaterJson: true
 
   cli:
     name: CLI binary (universal)
