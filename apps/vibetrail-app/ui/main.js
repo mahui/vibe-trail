@@ -29,6 +29,10 @@ const el = {
   checkUpdates: document.getElementById("check-updates"),
 };
 
+// Pseudo-project key for the pinned cross-project Recent view.
+const RECENT_KEY = "__recent__";
+const RECENT_LIMIT = 100;
+
 const state = {
   selectedProject: null,
   selectedSession: null,
@@ -93,7 +97,7 @@ const AGENT_META = {
   "claude-code": { abbr: "CC", name: "Claude Code" },
   "codex": { abbr: "CX", name: "Codex" },
   "antigravity": { abbr: "AG", name: "Antigravity (experimental)" },
-  "cursor": { abbr: "CU", name: "Cursor (experimental)" },
+  "cursor": { abbr: "CU", name: "Cursor (experimental)", guiResume: true, appName: "Cursor" },
   "qoder": { abbr: "QD", name: "Qoder" },
 };
 
@@ -269,8 +273,19 @@ function renderAgentFilter() {
   }
 }
 
+function recentRow() {
+  const li = text("li", "recent-row");
+  if (state.selectedProject === RECENT_KEY) li.classList.add("selected");
+  const name = text("div", "name", `🕘 ${t("app.recent")}`);
+  li.title = t("app.recentTitle");
+  li.append(name);
+  li.addEventListener("click", () => selectRecent(li));
+  return li;
+}
+
 function renderProjects() {
   el.projects.replaceChildren();
+  el.projects.append(recentRow());
   const visible = state.projects.filter(projectMatchesFilter);
   const hidden = [];
   let shown = 0;
@@ -338,12 +353,38 @@ async function addHiddenEntry(entry) {
   await saveConfig();
 }
 
+/// The search box promises what it will actually do: scoped placeholder
+/// when a project is selected, the global one otherwise (P0 fix).
+function syncSearchPlaceholder() {
+  const scoped = state.selectedProject && state.selectedProject !== RECENT_KEY;
+  el.search.placeholder = scoped
+    ? t("app.searchPlaceholderScoped", { name: shortPath(state.selectedProject) })
+    : t("app.searchPlaceholder");
+}
+
 async function selectProject(path, li) {
   state.selectedProject = path;
   el.projects.querySelectorAll(".selected").forEach((n) => n.classList.remove("selected"));
   if (li) li.classList.add("selected");
+  syncSearchPlaceholder();
   exitSearchMode();
   await loadSessions(path);
+}
+
+// ---- Recent view: latest sessions across every project -----------------------
+
+async function selectRecent(li) {
+  state.selectedProject = RECENT_KEY;
+  el.projects.querySelectorAll(".selected").forEach((n) => n.classList.remove("selected"));
+  if (li) li.classList.add("selected");
+  syncSearchPlaceholder();
+  exitSearchMode();
+  const generation = ++sessionState.generation;
+  el.sessions.replaceChildren(text("li", "notice", t("loading.sessions")));
+  const all = await call("list_all_handles");
+  if (generation !== sessionState.generation) return; // superseded click
+  all.sort((a, b) => (a.mtime < b.mtime ? 1 : -1));
+  renderSessionList(all.slice(0, RECENT_LIMIT), generation);
 }
 
 // ---- sessions (F2) ----------------------------------------------------------
@@ -466,6 +507,9 @@ function sessionRow(session) {
   const branch = session.gitBranch ? ` · ${session.gitBranch}` : "";
   const meta = text("div", "meta");
   meta.append(agentBadge(session.providerId));
+  // Time leads the meta line and reads brighter: it's what the eye scans
+  // for in a recency-sorted list.
+  meta.append(text("span", "meta-time", relativeTime(session.mtime)));
   meta.append(idChip(session.nativeId));
   if (depth === 0 && (sessionState.chainSize.get(session.nativeId) || 0) > 0) {
     const badge = text("span", "chain-badge", chainBadgeLabel(session.nativeId));
@@ -477,7 +521,12 @@ function sessionRow(session) {
     meta.append(badge);
   }
   meta.append(text("span", "",
-    ` ${t("sessions.meta", { time: relativeTime(session.mtime), n: session.messageCount, branch })}`));
+    ` ${t("sessions.count", { n: session.messageCount, branch })}`));
+  // The Recent view is cross-project: without the project name a row has
+  // no context.
+  if (state.selectedProject === RECENT_KEY) {
+    meta.append(text("span", "meta-project", ` · ${shortPath(session.projectPath)}`));
+  }
   li.append(meta);
   li.addEventListener("click", () => selectSession(session.id, li));
   return li;
@@ -702,6 +751,12 @@ async function loadDetail(sessionId) {
     projectPath: summary.projectPath,
   });
   el.resume.classList.toggle("hidden", !resumable);
+  // Resume means different things per provider: terminal command vs opening
+  // the owning GUI client. Say which before the click, not after.
+  const meta = AGENT_META[summary.providerId];
+  el.resume.title = meta && meta.guiResume
+    ? t("resume.guiApp", { app: meta.appName || meta.name })
+    : t("resume.terminal");
   el.resume.onclick = async () => {
     const note = await call("resume_session", { sessionId });
     if (note) toast(note, true);
@@ -778,8 +833,39 @@ function exitSearchMode() {
   el.sessions.classList.remove("hidden");
 }
 
+/// Effective search scope: the selected project narrows the search; the
+/// Recent pseudo-project and an explicit "Search all" mean the whole store.
+function searchScope(forceGlobal) {
+  if (forceGlobal || state.selectedProject === RECENT_KEY) return null;
+  return state.selectedProject;
+}
+
+/// The scope header keeps the search state honest and visible: hit count,
+/// what was searched, a one-click widening to the whole store, and an
+/// explicit exit — no more silently project-narrowed "all sessions" results.
+function resultsHeader(count, scoped, query) {
+  const header = text("li", "results-header");
+  header.append(text("span", "results-scope", t("search.resultsIn", {
+    n: count,
+    scope: scoped ? shortPath(scoped) : t("search.scopeAll"),
+  })));
+  if (scoped) {
+    const widen = text("button", "results-btn", t("search.searchAll"));
+    widen.addEventListener("click", () => runSearch(true));
+    header.append(widen);
+  }
+  const close = text("button", "results-btn", "✕");
+  close.title = t("search.exit");
+  close.addEventListener("click", () => {
+    el.search.value = "";
+    exitSearchMode();
+  });
+  header.append(close);
+  return header;
+}
+
 let searchGeneration = 0;
-async function runSearch() {
+async function runSearch(forceGlobal = false) {
   const query = el.search.value.trim();
   if (!query) {
     exitSearchMode();
@@ -789,9 +875,11 @@ async function runSearch() {
   el.results.replaceChildren(text("li", "empty", t("search.searching")));
   el.results.classList.remove("hidden");
   el.sessions.classList.add("hidden");
-  const hits = await call("search", { query, project: state.selectedProject });
+  const scope = searchScope(forceGlobal);
+  const hits = await call("search", { query, project: scope });
   if (generation !== searchGeneration) return; // superseded query
   el.results.replaceChildren();
+  el.results.append(resultsHeader(hits.length, scope, query));
   if (hits.length === 0) {
     el.results.append(text("li", "empty", t("search.noMatches", { query })));
     return;

@@ -123,18 +123,23 @@ body {
   flex-direction: column;
   gap: 6px;
 }
+/* Visually quieter than the session search box: same position, different
+   meaning — a local name filter must not read like full-text search. */
 #project-filter input {
   width: 100%;
   padding: 4px 8px;
-  border: 1px solid var(--border);
+  border: none;
   border-radius: 6px;
-  background: var(--bg);
+  background: var(--bg-alt);
   color: var(--text);
   font: inherit;
   font-size: 12px;
   outline: none;
 }
-#project-filter input:focus { border-color: var(--accent); }
+#project-filter input:focus {
+  background: var(--bg);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
 #project-filter-agents { display: flex; gap: 4px; flex-wrap: wrap; }
 #project-filter-agents:empty { display: none; }
 /* Subtractive model: lit = shown (solid provider color), unlit = excluded
@@ -179,6 +184,33 @@ body {
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
 }
 #search-results li.empty { padding: 16px 12px; color: var(--text-dim); }
+
+/* Search scope header: hit count + scope + widen/exit controls. Sticky so
+   the state stays visible while browsing results. */
+#search-results li.results-header {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  background: var(--bg-alt);
+  border-bottom: 1px solid var(--border);
+  font-size: 11px;
+  color: var(--text-dim);
+}
+.results-scope { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.results-btn {
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 11px;
+  padding: 2px 8px;
+  cursor: pointer;
+}
+.results-btn:hover { border-color: var(--text-dim); }
 
 /* Detail: timeline */
 #detail-header { justify-content: space-between; }
@@ -467,6 +499,14 @@ details.thinking summary { color: var(--thinking); }
   font: 11px/1.6 ui-monospace, "SF Mono", Menlo, monospace;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
+
+/* Recent pseudo-project: pinned above the list, exempt from filters. */
+#project-list li.recent-row {
+  border-bottom: 1px solid var(--border);
+}
+/* Session meta: time leads and reads brighter than the rest of the line. */
+.meta-time { color: var(--text); margin: 0 2px; }
+.meta-project { color: var(--text-dim); }
 
 #session-list li.notice,
 #project-list li.notice {

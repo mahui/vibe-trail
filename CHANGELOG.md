@@ -1,5 +1,24 @@
 # Changelog
 
+## Unreleased
+
+### Information architecture
+
+- Search scope is now honest and visible: the placeholder says what will be
+  searched ("Search in <project>…" vs "Search all sessions…"), and results
+  carry a sticky scope header — hit count, scope, one-click "Search all"
+  widening, and an explicit exit. Previously a selected project silently
+  narrowed the search while the box still promised "all sessions".
+- New pinned **Recent** view above the project list: the latest sessions
+  across every project, newest first, with the owning project on each row.
+- Session meta lines lead with the (brighter) relative time — what the eye
+  scans for in a recency-sorted list.
+- The Resume button's tooltip now says what will happen per provider
+  (terminal command vs opening the owning client) before the click.
+- The sidebar project filter reads visually quieter than the session search
+  box — same position, different meaning.
+- Settings: Language lives under an "Interface" group.
+
 ## 0.4.0 — 2026-07-03
 
 - Self-update: the app checks GitHub Releases in the background after boot
