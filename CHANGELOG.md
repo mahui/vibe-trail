@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.3.0 — 2026-07-03
 
 - Sidebar project filter: live name search plus per-agent badge toggles.
   Subtractive model — every agent starts lit (lit = shown, solid color;
