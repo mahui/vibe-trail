@@ -114,6 +114,48 @@ body {
 }
 #search-input:focus { border-color: var(--accent); }
 
+/* Sidebar project filter: name search + agent badge toggles. Display-layer
+   only — discovery, global search and the CLI are unaffected. */
+#project-filter {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+#project-filter input {
+  width: 100%;
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  outline: none;
+}
+#project-filter input:focus { border-color: var(--accent); }
+#project-filter-agents { display: flex; gap: 4px; flex-wrap: wrap; }
+#project-filter-agents:empty { display: none; }
+/* Subtractive model: lit = shown (solid provider color), unlit = excluded
+   (hollow outline, gray text). The visual state always matches the result —
+   everything lit by default means everything shown. */
+.agent-filter {
+  border: none;
+  cursor: pointer;
+  margin-right: 0;
+}
+.agent-filter:not(.active) {
+  background: transparent;
+  color: var(--text-dim);
+  box-shadow: inset 0 0 0 1px var(--border);
+}
+.agent-filter:not(.active):hover {
+  color: var(--text);
+  box-shadow: inset 0 0 0 1px var(--text-dim);
+}
+.agent-filter.active { color: #fff; }
+
 #session-list li, #search-results li.hit {
   padding: 8px 12px;
   cursor: default;

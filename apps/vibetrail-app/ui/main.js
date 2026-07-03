@@ -6,6 +6,8 @@ const invoke = window.__TAURI__.core.invoke;
 
 const el = {
   projects: document.getElementById("project-list"),
+  projectFilterInput: document.getElementById("project-filter-input"),
+  projectFilterAgents: document.getElementById("project-filter-agents"),
   sessions: document.getElementById("session-list"),
   results: document.getElementById("search-results"),
   search: document.getElementById("search-input"),
@@ -30,6 +32,11 @@ const state = {
   scrollTarget: null,
   projects: [],
   showHidden: false,
+  // Sidebar project filter (session-scoped, not persisted): substring match
+  // on the path plus agent toggles. Subtractive model — `excluded` holds the
+  // unlit agents; empty set = everything shown. A project stays visible while
+  // at least one of its agents is still lit.
+  projectFilter: { text: "", excluded: new Set() },
   // Mirror of the persisted AppConfig; always saved whole so one setting
   // never clobbers another.
   config: { terminal: "terminal", hiddenProjects: [], providers: {} },
@@ -131,6 +138,7 @@ async function loadProjects() {
     el.projects.replaceChildren(text("li", "notice", t("loading.projects")));
   }
   state.projects = await call("list_projects");
+  renderAgentFilter();
   renderProjects();
   warmSessionCache(); // fire-and-forget: makes first clicks instant
 }
@@ -211,12 +219,72 @@ function isProjectHidden(project) {
   return state.config.hiddenProjects.some((entry) => hiddenEntryMatches(entry, project));
 }
 
+function projectMatchesFilter(project) {
+  const needle = state.projectFilter.text.trim().toLowerCase();
+  const excluded = state.projectFilter.excluded;
+  return (
+    (!needle || project.realPath.toLowerCase().includes(needle)) &&
+    project.providers.some((id) => !excluded.has(id))
+  );
+}
+
+/// Agent toggles under the filter box, one per provider actually present in
+/// the store. All lit by default; clicking unlights (excludes) one.
+/// Unlighting the last lit agent is meaningless, so it resets to all-lit.
+/// Rebuilt on every project refresh; exclusions survive, and a provider
+/// that newly appears starts lit.
+function renderAgentFilter() {
+  const present = [];
+  for (const project of state.projects) {
+    for (const id of project.providers) {
+      if (!present.includes(id)) present.push(id);
+    }
+  }
+  present.sort();
+  const excluded = state.projectFilter.excluded;
+  for (const id of [...excluded]) {
+    if (!present.includes(id)) excluded.delete(id);
+  }
+  el.projectFilterAgents.replaceChildren();
+  if (present.length < 2) {
+    excluded.clear(); // one provider: nothing to narrow
+    return;
+  }
+  for (const id of present) {
+    const meta = AGENT_META[id] || { abbr: id.slice(0, 2).toUpperCase(), name: id };
+    const btn = text("button", `agent-badge agent-${id} agent-filter`, meta.abbr);
+    btn.title = meta.name;
+    if (!excluded.has(id)) btn.classList.add("active");
+    btn.addEventListener("click", () => {
+      if (excluded.has(id)) excluded.delete(id);
+      else excluded.add(id);
+      if (excluded.size === present.length) excluded.clear();
+      renderAgentFilter(); // reset can relight every badge, not just this one
+      renderProjects();
+    });
+    el.projectFilterAgents.append(btn);
+  }
+}
+
 function renderProjects() {
   el.projects.replaceChildren();
+  const visible = state.projects.filter(projectMatchesFilter);
   const hidden = [];
-  for (const project of state.projects) {
+  let shown = 0;
+  for (const project of visible) {
     if (isProjectHidden(project)) hidden.push(project);
-    else el.projects.append(projectRow(project, false));
+    else {
+      el.projects.append(projectRow(project, false));
+      shown++;
+    }
+  }
+  if (shown === 0 && hidden.length === 0) {
+    const filtering =
+      state.projectFilter.text.trim() || state.projectFilter.excluded.size > 0;
+    if (filtering && state.projects.length > 0) {
+      el.projects.append(text("li", "notice", t("projects.noMatches")));
+    }
+    return;
   }
   if (hidden.length === 0) return;
   const toggle = text("li", "hidden-toggle",
@@ -901,6 +969,19 @@ el.search.addEventListener("keydown", (event) => {
   if (event.key === "Escape") {
     el.search.value = "";
     exitSearchMode();
+  }
+});
+
+// Project name filter: live, session-scoped; Escape clears.
+el.projectFilterInput.addEventListener("input", () => {
+  state.projectFilter.text = el.projectFilterInput.value;
+  renderProjects();
+});
+el.projectFilterInput.addEventListener("keydown", (event) => {
+  if (event.key === "Escape") {
+    el.projectFilterInput.value = "";
+    state.projectFilter.text = "";
+    renderProjects();
   }
 });
 

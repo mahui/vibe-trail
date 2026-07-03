@@ -77,6 +77,7 @@ macOS 上的 coding agent 重度用户(每天多个 session、多项目、可能
 - 设置功能,按工程工具维度组织(TECH_SPEC §12):数据源(provider 开关 + 存储根覆盖 + 路径状态)/ Resume 终端 / 隐藏项目管理 / 配置文件出口(Reveal in Finder);发现配置下沉 Core,CLI 与 GUI 行为一致;新增 `vibetrail config [--json]` 检查生效配置
 - GUI 交互响应性("跟手")修复:Tauri command 全部移出主线程 + 壳层 SWR 缓存 + 启动预热,点击即时反馈(TECH_SPEC §7)
 - App 界面国际化:en/zh,设置面板切换(Auto/English/中文),偏好存 config.json;CLI 保持英文(TECH_SPEC §7)
+- 侧栏项目筛选:项目名实时搜索 + agent 徽标筛选(减法模型:默认全亮,亮=显示/实心色块,灭=排除/空心描边,视觉状态与结果始终一致;熄灭最后一个自动重置全亮);纯展示层,会话级不持久化
 
 ### 非目标(v1 明确不做)
 

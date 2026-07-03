@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- Sidebar project filter: live name search plus per-agent badge toggles.
+  Subtractive model — every agent starts lit (lit = shown, solid color;
+  unlit = excluded, hollow outline), so the visual state always matches the
+  result; unlighting the last agent resets to all-lit. Display-layer only —
+  discovery, global search and the CLI are unaffected.
+
 ## 0.2.0 — 2026-07-03
 
 ### Providers
