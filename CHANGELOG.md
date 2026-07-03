@@ -17,6 +17,11 @@
   (terminal command vs opening the owning client) before the click.
 - The sidebar project filter reads visually quieter than the session search
   box — same position, different meaning.
+- Agent filter reworked as a scope bar: an explicit [All] chip plus one chip
+  per agent, additive — focusing on a single agent is one click (it was N−1
+  under the previous subtractive model), further clicks add to the
+  selection, and emptying it returns to All. Highlighted = active scope
+  throughout.
 - Settings: Language lives under an "Interface" group.
 
 ## 0.4.0 — 2026-07-03

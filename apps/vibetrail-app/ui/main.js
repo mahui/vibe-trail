@@ -40,10 +40,10 @@ const state = {
   projects: [],
   showHidden: false,
   // Sidebar project filter (session-scoped, not persisted): substring match
-  // on the path plus agent toggles. Subtractive model — `excluded` holds the
-  // unlit agents; empty set = everything shown. A project stays visible while
-  // at least one of its agents is still lit.
-  projectFilter: { text: "", excluded: new Set() },
+  // on the path plus a scope bar of agents. `selected` holds the active
+  // scopes; empty set = the explicit "All" scope. Additive, so the highest-
+  // frequency task — focus on one agent — is a single click.
+  projectFilter: { text: "", selected: new Set() },
   // Mirror of the persisted AppConfig; always saved whole so one setting
   // never clobbers another.
   config: { terminal: "terminal", hiddenProjects: [], providers: {} },
@@ -228,18 +228,19 @@ function isProjectHidden(project) {
 
 function projectMatchesFilter(project) {
   const needle = state.projectFilter.text.trim().toLowerCase();
-  const excluded = state.projectFilter.excluded;
+  const selected = state.projectFilter.selected;
   return (
     (!needle || project.realPath.toLowerCase().includes(needle)) &&
-    project.providers.some((id) => !excluded.has(id))
+    (selected.size === 0 || project.providers.some((id) => selected.has(id)))
   );
 }
 
-/// Agent toggles under the filter box, one per provider actually present in
-/// the store. All lit by default; clicking unlights (excludes) one.
-/// Unlighting the last lit agent is meaningless, so it resets to all-lit.
-/// Rebuilt on every project refresh; exclusions survive, and a provider
-/// that newly appears starts lit.
+/// Scope bar under the filter box: an explicit [All] plus one chip per
+/// provider actually present in the store. Additive — clicking an agent
+/// from All focuses on it alone (one click for the most common task);
+/// further clicks add to / remove from the selection; emptying it, or
+/// clicking All, returns to the explicit All scope. Highlighted = active
+/// scope throughout.
 function renderAgentFilter() {
   const present = [];
   for (const project of state.projects) {
@@ -248,25 +249,33 @@ function renderAgentFilter() {
     }
   }
   present.sort();
-  const excluded = state.projectFilter.excluded;
-  for (const id of [...excluded]) {
-    if (!present.includes(id)) excluded.delete(id);
+  const selected = state.projectFilter.selected;
+  for (const id of [...selected]) {
+    if (!present.includes(id)) selected.delete(id);
   }
   el.projectFilterAgents.replaceChildren();
   if (present.length < 2) {
-    excluded.clear(); // one provider: nothing to narrow
+    selected.clear(); // one provider: nothing to narrow
     return;
   }
+  const all = text("button", "agent-badge agent-filter agent-all", t("projects.filterAll"));
+  all.title = t("projects.filterAllTitle");
+  if (selected.size === 0) all.classList.add("active");
+  all.addEventListener("click", () => {
+    selected.clear();
+    renderAgentFilter();
+    renderProjects();
+  });
+  el.projectFilterAgents.append(all);
   for (const id of present) {
     const meta = AGENT_META[id] || { abbr: id.slice(0, 2).toUpperCase(), name: id };
     const btn = text("button", `agent-badge agent-${id} agent-filter`, meta.abbr);
     btn.title = meta.name;
-    if (!excluded.has(id)) btn.classList.add("active");
+    if (selected.has(id)) btn.classList.add("active");
     btn.addEventListener("click", () => {
-      if (excluded.has(id)) excluded.delete(id);
-      else excluded.add(id);
-      if (excluded.size === present.length) excluded.clear();
-      renderAgentFilter(); // reset can relight every badge, not just this one
+      if (selected.has(id)) selected.delete(id);
+      else selected.add(id);
+      renderAgentFilter(); // the All chip lights up/down in lockstep
       renderProjects();
     });
     el.projectFilterAgents.append(btn);
@@ -298,7 +307,7 @@ function renderProjects() {
   }
   if (shown === 0 && hidden.length === 0) {
     const filtering =
-      state.projectFilter.text.trim() || state.projectFilter.excluded.size > 0;
+      state.projectFilter.text.trim() || state.projectFilter.selected.size > 0;
     if (filtering && state.projects.length > 0) {
       el.projects.append(text("li", "notice", t("projects.noMatches")));
     }
