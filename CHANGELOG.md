@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.4.0 — 2026-07-03
 
 - Self-update: the app checks GitHub Releases in the background after boot
   and shows a persistent banner when a new version is available — installs
