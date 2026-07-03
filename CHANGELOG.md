@@ -15,8 +15,8 @@
   scans for in a recency-sorted list.
 - The Resume button's tooltip now says what will happen per provider
   (terminal command vs opening the owning client) before the click.
-- The sidebar project filter reads visually quieter than the session search
-  box — same position, different meaning.
+- Search boxes share one style app-wide (the project filter and the session
+  search are visually identical; placeholders carry the semantic difference).
 - Agent filter reworked as a scope bar: an explicit [All] chip plus one chip
   per agent, additive — focusing on a single agent is one click (it was N−1
   under the previous subtractive model), further clicks add to the

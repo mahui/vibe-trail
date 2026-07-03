@@ -79,7 +79,7 @@ macOS 上的 coding agent 重度用户(每天多个 session、多项目、可能
 - App 界面国际化:en/zh,设置面板切换(Auto/English/中文),偏好存 config.json;CLI 保持英文(TECH_SPEC §7)
 - 侧栏项目筛选:项目名实时搜索 + agent scope bar(显式【全部】chip + 每 agent 一个 chip,加法模型:高亮=当前范围;从全部点某 agent 一次点击即单选聚焦,继续点并入多选,清空回到全部)——按任务频率优化:单选聚焦是最高频任务;纯展示层,会话级不持久化
 - App 自更新:启动后台检查 GitHub Releases,新版横幅提示、点击安装重启,永不静默;设置面板手动检查 + 版本号;minisign 验签(TECH_SPEC §7)
-- 信息架构修正:搜索范围显性化(placeholder 随选中项目联动 + 结果页 sticky 范围头部条:命中数/范围/一键搜全部/退出);侧栏置顶跨项目 Recent 视图(最新会话,行内带所属项目);会话 meta 行时间前置加亮;Resume 按钮 tooltip 按 provider 预告行为;筛选框与搜索框视觉分层;设置 Language 归入"界面"组
+- 信息架构修正:搜索范围显性化(placeholder 随选中项目联动 + 结果页 sticky 范围头部条:命中数/范围/一键搜全部/退出);侧栏置顶跨项目 Recent 视图(最新会话,行内带所属项目);会话 meta 行时间前置加亮;Resume 按钮 tooltip 按 provider 预告行为;搜索组件全 app 统一风格(语义差异由 placeholder 承载);设置 Language 归入"界面"组
 
 ### 非目标(v1 明确不做)
 
