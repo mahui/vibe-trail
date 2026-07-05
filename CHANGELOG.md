@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.5.1 — 2026-07-05
+
+- Clicking a search result now reliably jumps to the matched message in the
+  conversation timeline. Claude Code streams one message across several
+  transcript lines; hits on any chunk of a merged message previously found
+  no anchor and silently opened the session at the top. Messages now carry
+  the folded chunk uuids (`aliasUuids`) and the timeline resolves anchors
+  against them, scrolling to and highlighting the matched message.
+- When the matched message genuinely isn't in the timeline (e.g. it lives
+  in a subagent transcript), the app says so in a toast instead of failing
+  silently.
+
 ## 0.5.0 — 2026-07-03
 
 ### Information architecture
