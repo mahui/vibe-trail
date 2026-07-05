@@ -58,13 +58,17 @@ fn parses_parts_whitelist_with_tolerance() {
         ContentBlock::Text { text } if text.starts_with("Fix the subtitle")));
     let m2 = &session.messages[1];
     assert_eq!(m2.role, Role::Assistant);
-    assert!(matches!(&m2.blocks[1], ContentBlock::ToolUse { name, input }
-        if name == "Read" && input["file_path"] == "player/SubtitleView.swift"));
+    assert!(
+        matches!(&m2.blocks[1], ContentBlock::ToolUse { name, input }
+        if name == "Read" && input["file_path"] == "player/SubtitleView.swift")
+    );
     // role=tool renders as assistant-side tool output.
     let m3 = &session.messages[2];
     assert_eq!(m3.role, Role::Assistant);
-    assert!(matches!(&m3.blocks[0], ContentBlock::ToolResult { summary, truncated: false }
-        if summary.contains("withAnimation")));
+    assert!(
+        matches!(&m3.blocks[0], ContentBlock::ToolResult { summary, truncated: false }
+        if summary.contains("withAnimation"))
+    );
     let debug = &session.extensions["debug"];
     assert_eq!(debug["metaLines"], 1);
     assert_eq!(debug["ignoredRoles"]["future_role"], 1);

@@ -223,7 +223,10 @@ mod tests {
         assert_eq!(config.root_override("claude-code"), None);
         let store = store_from_config(&config);
         let ids: Vec<&str> = store.providers().iter().map(|p| p.id()).collect();
-        assert_eq!(ids, ["claude-code", "codex", "antigravity", "cursor", "qoder"]);
+        assert_eq!(
+            ids,
+            ["claude-code", "codex", "antigravity", "cursor", "qoder"]
+        );
     }
 
     #[test]

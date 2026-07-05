@@ -343,9 +343,7 @@ impl Provider for QoderProvider {
                         .unwrap_or(DateTime::<Utc>::UNIX_EPOCH),
                     file_size: metadata.len(),
                     file_path: transcript,
-                    parent_native_id: meta
-                        .parent_session_id
-                        .filter(|parent| !parent.is_empty()),
+                    parent_native_id: meta.parent_session_id.filter(|parent| !parent.is_empty()),
                 });
             }
         }
