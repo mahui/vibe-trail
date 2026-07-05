@@ -92,6 +92,11 @@ pub enum ContentBlock {
 #[serde(rename_all = "camelCase")]
 pub struct Message {
     pub uuid: String,
+    /// Uuids of physical chunks merged into this logical message (a streamed
+    /// message spans several transcript lines); search hits resolve on the
+    /// matched line, so anchoring must answer to every chunk uuid.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub alias_uuids: Vec<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub parent_uuid: Option<String>,
     pub role: Role,

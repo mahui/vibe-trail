@@ -245,6 +245,7 @@ impl CursorProvider {
         // createdAt anchors the whole transcript (duration degrades to 0).
         result.messages.push(Message {
             uuid: bubble_id.to_string(),
+            alias_uuids: Vec::new(),
             parent_uuid: None,
             role,
             blocks,

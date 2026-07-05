@@ -150,6 +150,9 @@ pub struct LogicalMessage {
     /// UUID of the last physical chunk: the next message's parentUuid points
     /// at it, so it is the node identity in the tree.
     uuid: String,
+    /// Uuids of earlier chunks folded into this message: search anchors on
+    /// the matched physical line, which may be any chunk.
+    alias_uuids: Vec<String>,
     parent_uuid: Option<String>,
     role: Role,
     timestamp: DateTime<Utc>,
@@ -183,7 +186,8 @@ fn regroup_by_message_id(entries: Vec<CcEntry>) -> Vec<LogicalMessage> {
                     // newest usage (final API totals).
                     messages[index].blocks.append(&mut blocks);
                     if let Some(uuid) = entry.uuid {
-                        messages[index].uuid = uuid;
+                        let previous = std::mem::replace(&mut messages[index].uuid, uuid);
+                        messages[index].alias_uuids.push(previous);
                     }
                     if let Some(usage) = entry.message.as_ref().and_then(|m| m.usage) {
                         messages[index].usage = Some(usage);
@@ -196,6 +200,7 @@ fn regroup_by_message_id(entries: Vec<CcEntry>) -> Vec<LogicalMessage> {
             uuid: entry
                 .uuid
                 .unwrap_or_else(|| format!("<no-uuid-{fallback_counter}>")),
+            alias_uuids: Vec::new(),
             parent_uuid: entry.parent_uuid,
             role,
             timestamp: parse_timestamp(entry.timestamp.as_deref())
@@ -321,6 +326,7 @@ fn transform(
         }
         transformed.push(Message {
             uuid: message.uuid,
+            alias_uuids: message.alias_uuids,
             parent_uuid: message.parent_uuid,
             role: message.role,
             blocks,

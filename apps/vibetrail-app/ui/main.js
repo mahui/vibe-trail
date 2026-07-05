@@ -821,13 +821,24 @@ function startTimeline(messages) {
   timelineState.observer.observe(sentinel);
   renderNextChunk();
   if (state.scrollTarget) {
-    // Render forward until the anchor exists, then jump to it.
-    const index = messages.findIndex((m) => m.uuid === state.scrollTarget);
+    // Render forward until the anchor exists, then jump to it. A hit may
+    // reference any physical chunk of a streamed message — aliasUuids carries
+    // the merged ones, so match against those too.
+    const anchor = state.scrollTarget;
+    const index = messages.findIndex(
+      (m) => m.uuid === anchor || (m.aliasUuids && m.aliasUuids.includes(anchor)));
     while (index >= 0 && timelineState.rendered <= index) renderNextChunk();
-    const target = el.timeline.querySelector(`[data-uuid="${CSS.escape(state.scrollTarget)}"]`);
+    const target = index >= 0
+      ? el.timeline.querySelector(`[data-uuid="${CSS.escape(messages[index].uuid)}"]`)
+      : null;
     if (target) {
       target.scrollIntoView({ block: "start" });
       target.classList.add("highlight");
+    } else {
+      // Anchor outside the timeline (e.g. a subagent transcript hit): say so
+      // instead of silently opening at the top.
+      el.timeline.scrollTop = 0;
+      toast(t("search.anchorMissing"), true);
     }
     state.scrollTarget = null;
   } else {

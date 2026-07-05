@@ -211,6 +211,7 @@ impl QoderProvider {
                     .id
                     .clone()
                     .unwrap_or_else(|| format!("L{}", index + 1)),
+                alias_uuids: Vec::new(),
                 parent_uuid: None,
                 role,
                 blocks,

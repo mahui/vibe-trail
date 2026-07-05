@@ -148,6 +148,7 @@ impl AntigravityProvider {
                 {
                     result.messages.push(Message {
                         uuid,
+                        alias_uuids: Vec::new(),
                         parent_uuid: None,
                         role,
                         blocks,

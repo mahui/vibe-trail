@@ -116,6 +116,7 @@ fn config_report_snapshot() {
 fn message_blocks_snapshot() {
     let message = Message {
         uuid: "a1y".to_string(),
+        alias_uuids: vec!["a1x".to_string()],
         parent_uuid: Some("u1".to_string()),
         role: Role::Assistant,
         blocks: vec![
@@ -138,6 +139,9 @@ fn message_blocks_snapshot() {
     };
     let expected = r#"{
   "uuid": "a1y",
+  "aliasUuids": [
+    "a1x"
+  ],
   "parentUuid": "u1",
   "role": "assistant",
   "blocks": [

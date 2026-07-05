@@ -99,6 +99,7 @@ pub fn run_with_limit(data: &[u8], result_limit: usize) -> CodexParseResult {
                     }
                     result.messages.push(Message {
                         uuid: format!("L{line_number}"),
+                        alias_uuids: Vec::new(),
                         parent_uuid: None,
                         role,
                         blocks,

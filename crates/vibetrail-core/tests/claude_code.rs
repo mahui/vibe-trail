@@ -52,6 +52,9 @@ fn regroups_streamed_assistant_message() {
     let merged = &session.messages[1];
     assert_eq!(merged.role, Role::Assistant);
     assert_eq!(merged.uuid, "a1y");
+    // Search hits resolve on the matched physical line: the folded chunk's
+    // uuid must stay addressable as an alias.
+    assert_eq!(merged.alias_uuids, vec!["a1x"]);
     assert_eq!(merged.parent_uuid.as_deref(), Some("u1"));
     assert_eq!(merged.blocks.len(), 2);
     let ContentBlock::Text { text } = &merged.blocks[0] else {
