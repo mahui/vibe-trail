@@ -14,6 +14,12 @@ const el = {
   timeline: document.getElementById("timeline"),
   title: document.getElementById("detail-title"),
   resume: document.getElementById("resume-btn"),
+  handoff: document.getElementById("handoff-btn"),
+  handoffOverlay: document.getElementById("handoff-overlay"),
+  handoffClose: document.getElementById("handoff-close"),
+  handoffPrompt: document.getElementById("handoff-prompt"),
+  handoffCopy: document.getElementById("handoff-copy"),
+  handoffTargets: document.getElementById("handoff-targets"),
   toast: document.getElementById("toast"),
   terminal: document.getElementById("terminal-select"),
   language: document.getElementById("language-select"),
@@ -65,6 +71,18 @@ function relativeTime(iso) {
   if (seconds < 86400) return t("time.hoursAgo", { n: Math.floor(seconds / 3600) });
   if (seconds < 86400 * 30) return t("time.daysAgo", { n: Math.floor(seconds / 86400) });
   return new Date(iso).toISOString().slice(0, 10);
+}
+
+// Snapshot semantics, deliberately no timer/watcher (ADR-2): "active" means
+// the transcript file was appended within the last two minutes as of this
+// render; any refresh or click re-evaluates.
+const ACTIVE_WINDOW_MS = 2 * 60 * 1000;
+
+function activeDot(iso) {
+  if (Date.now() - new Date(iso).getTime() > ACTIVE_WINDOW_MS) return null;
+  const dot = text("span", "active-dot", "●");
+  dot.title = t("active.title");
+  return dot;
 }
 
 function compact(n) {
@@ -187,6 +205,8 @@ function projectRow(project, hidden) {
   name.append(toggle);
   li.append(name);
   const meta = text("div", "meta");
+  const dot = activeDot(project.lastActive);
+  if (dot) meta.append(dot);
   meta.append(text("span", "",
     `${t("project.sessions", { n: project.sessionCount })} · ${relativeTime(project.lastActive)} `));
   for (const provider of project.providers) meta.append(agentBadge(provider));
@@ -516,6 +536,8 @@ function sessionRow(session) {
   const branch = session.gitBranch ? ` · ${session.gitBranch}` : "";
   const meta = text("div", "meta");
   meta.append(agentBadge(session.providerId));
+  const dot = activeDot(session.mtime);
+  if (dot) meta.append(dot);
   // Time leads the meta line and reads brighter: it's what the eye scans
   // for in a recency-sorted list.
   meta.append(text("span", "meta-time", relativeTime(session.mtime)));
@@ -549,6 +571,8 @@ async function loadSessions(path) {
   } else {
     el.sessions.replaceChildren(text("li", "notice", t("loading.sessions")));
   }
+  loadProjectMemory(path, generation); // fire-and-forget, rows appear when found
+  loadProjectAgents(path, generation);
   const handles = await call("list_session_handles", { project: path });
   if (generation !== sessionState.generation) return; // superseded click
   handleCache.set(path, handles);
@@ -556,6 +580,143 @@ async function loadSessions(path) {
   if (!cached || JSON.stringify(cached) !== JSON.stringify(handles)) {
     renderSessionList(handles, generation);
   }
+}
+
+// ---- project memory (F7): read-only view of what each agent remembers ------
+
+const memoryCache = new Map(); // project path -> MemoryDoc[]
+
+function memoryRow(docs) {
+  const li = text("li", "memory-row");
+  li.title = t("memory.rowTitle");
+  li.append(text("div", "name", `🧠 ${t("memory.row", { n: docs.length })}`));
+  li.addEventListener("click", openMemory);
+  return li;
+}
+
+/// The pinned row only exists when the project actually has memory; it is
+/// re-added after every session-list re-render (SWR revalidate included).
+function ensureMemoryRow() {
+  const project = state.selectedProject;
+  if (!project || project === RECENT_KEY) return;
+  const docs = memoryCache.get(project);
+  if (!docs || docs.length === 0) return;
+  if (el.sessions.querySelector(".memory-row")) return;
+  el.sessions.insertBefore(memoryRow(docs), el.sessions.firstChild);
+}
+
+async function loadProjectMemory(path, generation) {
+  try {
+    const docs = await invoke("get_project_memory", { project: path });
+    memoryCache.set(path, docs);
+    if (generation !== sessionState.generation) return; // superseded click
+    ensureMemoryRow();
+  } catch (_) { /* memory is optional; the row just stays absent */ }
+}
+
+// ---- custom-agent roster: definitions visible to this project ---------------
+
+const agentsCache = new Map(); // project path -> AgentDef[]
+
+function agentsRow(defs) {
+  const li = text("li", "agents-row");
+  li.title = t("agents.rowTitle");
+  li.append(text("div", "name", `🤖 ${t("agents.row", { n: defs.length })}`));
+  li.addEventListener("click", openAgents);
+  return li;
+}
+
+/// Pinned under the memory row (or first, when there is no memory); only
+/// exists when the project actually has definitions.
+function ensureAgentsRow() {
+  const project = state.selectedProject;
+  if (!project || project === RECENT_KEY) return;
+  const defs = agentsCache.get(project);
+  if (!defs || defs.length === 0) return;
+  if (el.sessions.querySelector(".agents-row")) return;
+  const memory = el.sessions.querySelector(".memory-row");
+  const row = agentsRow(defs);
+  if (memory) memory.after(row);
+  else el.sessions.insertBefore(row, el.sessions.firstChild);
+}
+
+async function loadProjectAgents(path, generation) {
+  try {
+    const defs = await invoke("get_project_agents", { project: path });
+    agentsCache.set(path, defs);
+    if (generation !== sessionState.generation) return; // superseded click
+    ensureAgentsRow();
+  } catch (_) { /* roster is optional */ }
+}
+
+function openAgents() {
+  const project = state.selectedProject;
+  const defs = agentsCache.get(project) || [];
+  state.selectedSession = null;
+  el.sessions.querySelectorAll(".selected").forEach((n) => n.classList.remove("selected"));
+  const row = el.sessions.querySelector(".agents-row");
+  if (row) row.classList.add("selected");
+  el.resume.classList.add("hidden");
+  el.handoff.classList.add("hidden");
+  el.title.classList.remove("placeholder");
+  el.title.replaceChildren(
+    text("span", "", `🤖 ${t("agents.title")}`),
+    document.createElement("br"),
+    text("span", "sub", `${project} · ${t("agents.count", { n: defs.length })}`),
+  );
+  if (timelineState.observer) timelineState.observer.disconnect();
+  el.timeline.replaceChildren();
+  for (const def of defs) {
+    const box = text("div", "artifacts memory-doc");
+    const head = text("div", "artifacts-title memory-head");
+    head.append(agentBadge(def.providerId));
+    head.append(text("span", "memory-name", def.name));
+    head.append(text("span", "memory-type", t(`agents.scope.${def.scope}`)));
+    if (def.model) head.append(text("span", "memory-type", def.model));
+    box.append(head);
+    if (def.description) box.append(text("div", "memory-desc", def.description));
+    if (def.tools) {
+      box.append(text("div", "memory-desc", `${t("agents.tools")}: ${def.tools}`));
+    }
+    // System prompts run long: collapsed by default, like tool blocks.
+    const details = text("details", "block tool");
+    details.append(text("summary", "", t("agents.systemPrompt")));
+    details.append(markdownNode(def.content)); // untrusted input: sanitized
+    box.append(details);
+    el.timeline.append(box);
+  }
+  el.timeline.scrollTop = 0;
+}
+
+function openMemory() {
+  const project = state.selectedProject;
+  const docs = memoryCache.get(project) || [];
+  state.selectedSession = null;
+  el.sessions.querySelectorAll(".selected").forEach((n) => n.classList.remove("selected"));
+  const row = el.sessions.querySelector(".memory-row");
+  if (row) row.classList.add("selected");
+  el.resume.classList.add("hidden");
+  el.handoff.classList.add("hidden");
+  el.title.classList.remove("placeholder");
+  el.title.replaceChildren(
+    text("span", "", `🧠 ${t("memory.title")}`),
+    document.createElement("br"),
+    text("span", "sub", `${project} · ${t("memory.count", { n: docs.length })}`),
+  );
+  if (timelineState.observer) timelineState.observer.disconnect();
+  el.timeline.replaceChildren();
+  for (const doc of docs) {
+    const box = text("div", "artifacts memory-doc");
+    const head = text("div", "artifacts-title memory-head");
+    head.append(agentBadge(doc.providerId));
+    head.append(text("span", "memory-name", doc.name));
+    if (doc.docType) head.append(text("span", "memory-type", doc.docType));
+    box.append(head);
+    if (doc.description) box.append(text("div", "memory-desc", doc.description));
+    box.append(markdownNode(doc.content)); // untrusted input: sanitized path
+    el.timeline.append(box);
+  }
+  el.timeline.scrollTop = 0;
 }
 
 function renderSessionList(handles, generation) {
@@ -572,6 +733,8 @@ function renderSessionList(handles, generation) {
     if (entries.some((entry) => entry.isIntersecting)) loadNextSessionPage();
   }, { root: el.sessions, rootMargin: "400px" });
   sessionState.observer.observe(sentinel);
+  ensureMemoryRow(); // both pinned rows survive SWR re-renders
+  ensureAgentsRow();
   loadNextSessionPage();
 }
 
@@ -734,6 +897,21 @@ async function loadDetail(sessionId) {
     }
     el.timeline.append(box);
   }
+  // Agent team (CC experimental): per-session entity — "a session that led
+  // a team", not a durable cross-session org structure.
+  const team = session.extensions && session.extensions.team;
+  if (team && Array.isArray(team.members) && team.members.length > 0) {
+    const box = text("div", "artifacts");
+    box.append(text("div", "artifacts-title",
+      t("detail.team", { n: team.members.length })));
+    for (const member of team.members) {
+      const row = text("div", "artifact");
+      row.append(text("span", "artifact-name", member.name));
+      row.append(text("span", "artifact-summary", member.agentType));
+      box.append(row);
+    }
+    el.timeline.append(box);
+  }
   const subagents = session.extensions && session.extensions.subagents;
   if (Array.isArray(subagents) && subagents.length > 0) {
     const box = text("div", "artifacts");
@@ -754,6 +932,9 @@ async function loadDetail(sessionId) {
     el.timeline.append(box);
   }
   startTimeline(session.messages);
+  // Any parsed session can be handed off; target availability is checked
+  // when the panel opens.
+  el.handoff.classList.remove("hidden");
   // Capability + path check only; no re-discovery on the backend.
   const resumable = await call("can_resume", {
     providerId: summary.providerId,
@@ -936,6 +1117,66 @@ async function openHit(hit, li) {
   await loadDetail(hit.sessionId);
 }
 
+// ---- handoff (TECH_SPEC §14) --------------------------------------------------
+// Template tier: the capsule is derived backend-side from the parsed
+// transcript; nothing leaves the machine until the user launches or pastes.
+
+async function openHandoff() {
+  const sessionId = state.selectedSession;
+  if (!sessionId) return;
+  el.handoffPrompt.textContent = t("loading.generic");
+  el.handoffTargets.replaceChildren();
+  el.handoffOverlay.classList.remove("hidden");
+  let data;
+  try {
+    data = await invoke("get_handoff", { sessionId });
+  } catch (error) {
+    toast(String(error));
+    closeHandoff();
+    return;
+  }
+  el.handoffPrompt.textContent = data.prompt;
+  for (const target of data.targets) {
+    const meta = AGENT_META[target] || { name: target };
+    const btn = text("button", "handoff-target",
+      t("handoff.continueIn", { name: meta.appName || meta.name }));
+    if (!data.projectExists) {
+      btn.disabled = true;
+      btn.title = t("handoff.projectMissing");
+    }
+    btn.addEventListener("click", async () => {
+      btn.disabled = true;
+      try {
+        const note = await invoke("handoff_continue", { sessionId, target });
+        if (note) toast(note, true);
+        closeHandoff();
+      } catch (error) {
+        toast(String(error));
+        btn.disabled = false;
+      }
+    });
+    el.handoffTargets.append(btn);
+  }
+}
+
+function closeHandoff() {
+  el.handoffOverlay.classList.add("hidden");
+}
+
+el.handoff.addEventListener("click", openHandoff);
+el.handoffClose.addEventListener("click", closeHandoff);
+el.handoffOverlay.addEventListener("click", (event) => {
+  if (event.target === el.handoffOverlay) closeHandoff();
+});
+el.handoffCopy.addEventListener("click", async () => {
+  try {
+    await invoke("copy_to_clipboard", { text: el.handoffPrompt.textContent });
+    toast(t("handoff.copied"), true);
+  } catch (error) {
+    toast(String(error));
+  }
+});
+
 // ---- settings ----------------------------------------------------------------
 // Grouped by engineering-tool dimensions (TECH_SPEC §12): data sources /
 // resume workflow / workspace, with the config file itself as the footer.
@@ -1057,6 +1298,23 @@ function renderHiddenProjects() {
   el.settingsHidden.append(form);
 }
 
+// Settings tabs: all pages stay mounted, switching is pure class toggling;
+// the last-viewed tab survives close/reopen within a run.
+const settingsTabs = document.querySelectorAll(".settings-tab");
+const settingsPages = document.querySelectorAll(".settings-page");
+function selectSettingsTab(name) {
+  settingsTabs.forEach((tab) => tab.classList.toggle("active", tab.dataset.tab === name));
+  settingsPages.forEach((page) => page.classList.toggle("active", page.dataset.page === name));
+}
+settingsTabs.forEach((tab) =>
+  tab.addEventListener("click", () => selectSettingsTab(tab.dataset.tab)));
+
+// The repo link must open in the system browser, never navigate the webview.
+document.getElementById("about-repo").addEventListener("click", (event) => {
+  event.preventDefault();
+  call("open_external", { url: event.currentTarget.href });
+});
+
 el.settingsBtn.addEventListener("click", openSettings);
 // Native menu bar "Settings…" (⌘,) — the Rust shell emits this event.
 if (window.__TAURI__.event) {
@@ -1067,9 +1325,9 @@ el.settingsOverlay.addEventListener("click", (event) => {
   if (event.target === el.settingsOverlay) closeSettings();
 });
 document.addEventListener("keydown", (event) => {
-  if (event.key === "Escape" && !el.settingsOverlay.classList.contains("hidden")) {
-    closeSettings();
-  }
+  if (event.key !== "Escape") return;
+  if (!el.handoffOverlay.classList.contains("hidden")) closeHandoff();
+  else if (!el.settingsOverlay.classList.contains("hidden")) closeSettings();
 });
 el.configReveal.addEventListener("click", () => call("reveal_config"));
 

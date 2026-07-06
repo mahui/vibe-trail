@@ -458,6 +458,21 @@ impl Provider for CursorProvider {
         Ok(result.messages.into_iter().find(|m| m.uuid == message_uuid))
     }
 
+    /// Handoff target: no prompt-at-launch surface — open the project and
+    /// let the shell put the prompt on the clipboard (GuiApp contract).
+    fn launch_with_prompt(&self, project_path: &str, _prompt: &str) -> Option<ResumeSpec> {
+        Some(ResumeSpec {
+            project_path: project_path.to_string(),
+            command: vec![
+                "open".to_string(),
+                "-a".to_string(),
+                "Cursor".to_string(),
+                project_path.to_string(),
+            ],
+            launch: LaunchMode::GuiApp,
+        })
+    }
+
     /// Header-level title: Cursor's own chat name when present, else the
     /// first user bubble (legacy: inline; current: at most a handful of
     /// point queries). Stays metadata-bounded either way.

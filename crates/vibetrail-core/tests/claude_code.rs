@@ -292,3 +292,109 @@ fn search_scoped_to_unknown_project_returns_nothing() {
         .unwrap()
         .is_empty());
 }
+
+// Memory: <project-dir>/memory/*.md surfaces read-only, MEMORY.md first,
+// frontmatter parsed with whitelist tolerance.
+#[test]
+fn project_memory_surfaces_index_first_with_frontmatter() {
+    let docs = provider().project_memory("/Users/tester/demo-app");
+    assert_eq!(docs.len(), 3);
+    assert_eq!(docs[0].name, "MEMORY");
+    assert!(docs[0].description.is_none()); // no frontmatter on the index
+    assert!(docs[0].content.starts_with("# Memory index"));
+    assert_eq!(docs[1].name, "login-flow");
+    assert_eq!(
+        docs[1].description.as_deref(),
+        Some("Token refresh happens in middleware, not the client")
+    );
+    assert_eq!(docs[1].doc_type.as_deref(), Some("project"));
+    assert!(docs[1].content.contains("middleware.ts"));
+    assert!(!docs[1].content.contains("---")); // frontmatter stripped
+    assert_eq!(docs[2].doc_type.as_deref(), Some("user"));
+    // Store-level aggregation normalizes the path before dispatch.
+    assert_eq!(store().project_memory("/Users/tester/demo-app/").len(), 3);
+}
+
+#[test]
+fn project_memory_unknown_project_is_empty() {
+    assert!(provider()
+        .project_memory("/nonexistent/elsewhere")
+        .is_empty());
+}
+
+// Handoff (TECH_SPEC §14): the capsule is a pure derivation of the parsed
+// session — goal/branch/files/last-exchange — and renders a stable prompt.
+#[test]
+fn handoff_capsule_derives_from_session() {
+    use vibetrail_core::HandoffCapsule;
+    let session = provider().parse(&raw(SESSION_1)).unwrap();
+    let capsule = HandoffCapsule::from_session(&session);
+    assert_eq!(capsule.previous_agent, "claude-code");
+    assert_eq!(capsule.project_path, "/Users/tester/demo-app");
+    assert_eq!(capsule.git_branch.as_deref(), Some("main"));
+    assert_eq!(capsule.goal, session.summary.title);
+    assert_eq!(capsule.files_touched, ["/Users/tester/demo-app/login.js"]);
+    assert_eq!(capsule.files_omitted, 0);
+    assert!(capsule.last_user_prompt.is_some());
+    assert!(capsule.last_assistant_text.is_some());
+    let prompt = capsule.prompt();
+    assert!(prompt.contains("Goal: "));
+    assert!(prompt.contains("Branch: main"));
+    assert!(prompt.contains("- /Users/tester/demo-app/login.js"));
+    assert!(prompt.contains("Previous agent: claude-code"));
+}
+
+#[test]
+fn handoff_targets_and_spec() {
+    let store = store();
+    // Fixture store has only the CC provider; it takes a prompt at launch.
+    assert_eq!(store.handoff_targets(), ["claude-code"]);
+    // Nonexistent project path fails the same precondition as resume.
+    let error = store
+        .handoff_spec("claude-code", "/Users/tester/demo-app", "prompt")
+        .unwrap_err();
+    assert!(matches!(error, Error::ResumePrecondition(_)));
+    // An existing directory yields the seeded launch command.
+    let spec = store
+        .handoff_spec(
+            "claude-code",
+            env!("CARGO_MANIFEST_DIR"),
+            "continue the task",
+        )
+        .unwrap();
+    assert_eq!(spec.command, ["claude", "continue the task"]);
+}
+
+// Agent teams (experimental CC feature): per-session entity linked by
+// leadSessionId; surfaces via extensions, whitelist-tolerant.
+#[test]
+fn team_extension_links_by_lead_session_id() {
+    let session = provider().parse(&raw(SESSION_1)).unwrap();
+    let team = &session.extensions["team"];
+    assert_eq!(team["name"], "session-demo");
+    let members = team["members"].as_array().unwrap();
+    assert_eq!(members.len(), 2);
+    assert_eq!(members[0]["name"], "team-lead");
+    assert_eq!(members[1]["agentType"], "general-purpose");
+    // Sessions that led no team carry no extension.
+    let other = provider().parse(&raw(SESSION_2)).unwrap();
+    assert!(!other.extensions.contains_key("team"));
+}
+
+// Custom-agent roster: user-global definitions (fixture agents/ dir sits
+// beside the projects root, mirroring ~/.claude/agents) parse via the same
+// frontmatter dialect as memory docs. Project-level defs share this path.
+#[test]
+fn project_agents_parses_definitions() {
+    let defs = provider().project_agents("/Users/tester/demo-app");
+    assert_eq!(defs.len(), 1);
+    assert_eq!(defs[0].name, "reviewer");
+    assert_eq!(
+        defs[0].description.as_deref(),
+        Some("Reviews diffs for correctness before merge")
+    );
+    assert_eq!(defs[0].model.as_deref(), Some("opus"));
+    assert_eq!(defs[0].tools.as_deref(), Some("Read, Grep, Bash"));
+    assert_eq!(defs[0].scope, "user");
+    assert!(defs[0].content.contains("meticulous code reviewer"));
+}

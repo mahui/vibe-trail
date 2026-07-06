@@ -117,6 +117,53 @@ impl SessionStore {
         Ok(projects)
     }
 
+    /// Providers that can act as a handoff target (accept an initial prompt
+    /// at launch), in registration order.
+    pub fn handoff_targets(&self) -> Vec<&'static str> {
+        self.providers
+            .iter()
+            .filter(|p| p.launch_with_prompt("/", "").is_some())
+            .map(|p| p.id())
+            .collect()
+    }
+
+    /// Launch spec for continuing in `target` at the project with a handoff
+    /// prompt. Same precondition as resume: the project path must exist.
+    pub fn handoff_spec(
+        &self,
+        target: &str,
+        project_path: &str,
+        prompt: &str,
+    ) -> Result<crate::provider::ResumeSpec> {
+        if !Path::new(project_path).is_dir() {
+            return Err(Error::ResumePrecondition(format!(
+                "Project path does not exist: {project_path}"
+            )));
+        }
+        self.provider(target)
+            .and_then(|p| p.launch_with_prompt(project_path, prompt))
+            .ok_or_else(|| Error::Unsupported(format!("{target} cannot take a handoff prompt")))
+    }
+
+    /// Every provider's project-scoped memory documents for one project,
+    /// provider order preserved (each provider orders its own docs).
+    pub fn project_memory(&self, project_path: &str) -> Vec<crate::model::MemoryDoc> {
+        let normalized = normalize_path(project_path);
+        self.providers
+            .iter()
+            .flat_map(|provider| provider.project_memory(&normalized))
+            .collect()
+    }
+
+    /// Every provider's custom-agent definitions for one project.
+    pub fn project_agents(&self, project_path: &str) -> Vec<crate::model::AgentDef> {
+        let normalized = normalize_path(project_path);
+        self.providers
+            .iter()
+            .flat_map(|provider| provider.project_agents(&normalized))
+            .collect()
+    }
+
     /// F2 discovery half: every session handle of one project, newest first.
     /// Metadata only — pair with `summarize_handles` to page in summaries
     /// without re-running discovery per page.

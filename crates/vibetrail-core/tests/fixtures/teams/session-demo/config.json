@@ -1,0 +1,25 @@
+{
+  "name": "session-demo",
+  "createdAt": 1782500718341,
+  "leadAgentId": "team-lead@session-demo",
+  "leadSessionId": "11111111-1111-1111-1111-111111111111",
+  "members": [
+    {
+      "agentId": "team-lead@session-demo",
+      "name": "team-lead",
+      "agentType": "team-lead",
+      "joinedAt": 1782500718341,
+      "cwd": "/Users/tester/demo-app",
+      "backendType": "in-process"
+    },
+    {
+      "agentId": "researcher@session-demo",
+      "name": "researcher",
+      "agentType": "general-purpose",
+      "joinedAt": 1782500720000,
+      "cwd": "/Users/tester/demo-app",
+      "backendType": "in-process",
+      "futureField": { "ignored": true }
+    }
+  ]
+}

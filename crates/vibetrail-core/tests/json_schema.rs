@@ -4,7 +4,10 @@
 
 use chrono::{DateTime, Utc};
 use vibetrail_core::config::{ConfigReport, ProviderStatus};
-use vibetrail_core::{ContentBlock, Message, Project, Role, SearchHit, SessionSummary};
+use vibetrail_core::{
+    AgentDef, ContentBlock, HandoffCapsule, MemoryDoc, Message, Project, Role, SearchHit,
+    SessionSummary,
+};
 
 fn fixed_time() -> DateTime<Utc> {
     DateTime::from_timestamp(1_750_000_000, 0).unwrap()
@@ -169,4 +172,83 @@ fn message_blocks_snapshot() {
   "timestamp": "2025-06-15T15:06:40Z"
 }"#;
     assert_eq!(serde_json::to_string_pretty(&message).unwrap(), expected);
+}
+
+#[test]
+fn memory_doc_snapshot() {
+    let doc = MemoryDoc {
+        provider_id: "claude-code".to_string(),
+        name: "login-flow".to_string(),
+        description: Some("Token refresh happens in middleware".to_string()),
+        doc_type: Some("project".to_string()),
+        content: "The login module refreshes tokens.".to_string(),
+        file_path: "/Users/tester/.claude/projects/-x/memory/login-flow.md".into(),
+        mtime: fixed_time(),
+    };
+    let expected = r#"{
+  "providerId": "claude-code",
+  "name": "login-flow",
+  "description": "Token refresh happens in middleware",
+  "docType": "project",
+  "content": "The login module refreshes tokens.",
+  "filePath": "/Users/tester/.claude/projects/-x/memory/login-flow.md",
+  "mtime": "2025-06-15T15:06:40Z"
+}"#;
+    assert_eq!(serde_json::to_string_pretty(&doc).unwrap(), expected);
+}
+
+#[test]
+fn handoff_capsule_snapshot() {
+    let capsule = HandoffCapsule {
+        goal: "Fix the auth middleware bug".to_string(),
+        project_path: "/Users/tester/backend".to_string(),
+        git_branch: Some("fix-auth".to_string()),
+        previous_agent: "claude-code".to_string(),
+        message_count: 12,
+        files_touched: vec!["src/auth/middleware.ts".to_string()],
+        files_omitted: 0,
+        last_user_prompt: Some("run the tests".to_string()),
+        last_assistant_text: Some("Tests not run yet.".to_string()),
+    };
+    let expected = r#"{
+  "goal": "Fix the auth middleware bug",
+  "projectPath": "/Users/tester/backend",
+  "gitBranch": "fix-auth",
+  "previousAgent": "claude-code",
+  "messageCount": 12,
+  "filesTouched": [
+    "src/auth/middleware.ts"
+  ],
+  "filesOmitted": 0,
+  "lastUserPrompt": "run the tests",
+  "lastAssistantText": "Tests not run yet."
+}"#;
+    assert_eq!(serde_json::to_string_pretty(&capsule).unwrap(), expected);
+}
+
+#[test]
+fn agent_def_snapshot() {
+    let def = AgentDef {
+        provider_id: "claude-code".to_string(),
+        name: "reviewer".to_string(),
+        description: Some("Reviews diffs before merge".to_string()),
+        model: Some("opus".to_string()),
+        tools: Some("Read, Grep".to_string()),
+        scope: "project".to_string(),
+        content: "You are a reviewer.".to_string(),
+        file_path: "/Users/tester/demo-app/.claude/agents/reviewer.md".into(),
+        mtime: fixed_time(),
+    };
+    let expected = r#"{
+  "providerId": "claude-code",
+  "name": "reviewer",
+  "description": "Reviews diffs before merge",
+  "model": "opus",
+  "tools": "Read, Grep",
+  "scope": "project",
+  "content": "You are a reviewer.",
+  "filePath": "/Users/tester/demo-app/.claude/agents/reviewer.md",
+  "mtime": "2025-06-15T15:06:40Z"
+}"#;
+    assert_eq!(serde_json::to_string_pretty(&def).unwrap(), expected);
 }

@@ -66,10 +66,35 @@ enum Command {
         #[arg(long)]
         json: bool,
     },
+    /// Show agent-persisted project memory, read-only (F7).
+    Memory {
+        /// Project path, or a unique directory-name suffix.
+        project: String,
+        /// Emit JSON.
+        #[arg(long)]
+        json: bool,
+    },
+    /// List custom-agent definitions visible to a project (roster).
+    Agents {
+        /// Project path, or a unique directory-name suffix.
+        project: String,
+        /// Emit JSON.
+        #[arg(long)]
+        json: bool,
+    },
     /// Resume a session in its project directory (F5).
     Resume {
         /// Session id (or unique prefix).
         session_id: String,
+    },
+    /// Print a handoff prompt for continuing a session in another agent
+    /// (pipe to pbcopy), or --json for the structured capsule.
+    Handoff {
+        /// Session id (or unique prefix).
+        session_id: String,
+        /// Emit the structured capsule as JSON instead of the prompt.
+        #[arg(long)]
+        json: bool,
     },
     /// Open the VibeTrail GUI app.
     Open {
@@ -130,7 +155,10 @@ fn main() {
             json,
             ..
         } => commands::show(&store(), &session_id, full, json),
+        Command::Memory { project, json } => commands::memory(&store(), &project, json),
+        Command::Agents { project, json } => commands::agents(&store(), &project, json),
         Command::Resume { session_id } => commands::resume(&store(), &session_id),
+        Command::Handoff { session_id, json } => commands::handoff(&store(), &session_id, json),
         Command::Open { project } => commands::open_gui(project.as_deref()),
         Command::Config { json } => commands::config_report(json),
     };

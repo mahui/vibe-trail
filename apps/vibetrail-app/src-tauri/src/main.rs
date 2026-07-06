@@ -7,8 +7,8 @@ mod config;
 mod resumer;
 
 use vibetrail_core::{
-    search_store, Message, Project, RawSession, Scope, SearchHit, Session, SessionStore,
-    SessionSummary,
+    search_store, AgentDef, MemoryDoc, Message, Project, RawSession, Scope, SearchHit, Session,
+    SessionStore, SessionSummary,
 };
 
 /// Stores are stateless (live reads, ADR-2), so each command builds one —
@@ -64,6 +64,69 @@ async fn summarize_sessions(handles: Vec<RawSession>) -> Vec<SessionSummary> {
     blocking(move || Ok(store().summarize_handles(&handles)))
         .await
         .unwrap_or_default()
+}
+
+/// F7: agent-persisted project memory, read-only.
+#[tauri::command]
+async fn get_project_memory(project: String) -> Result<Vec<MemoryDoc>, String> {
+    blocking(move || Ok(store().project_memory(&project))).await
+}
+
+/// Custom-agent roster for a project, read-only.
+#[tauri::command]
+async fn get_project_agents(project: String) -> Result<Vec<AgentDef>, String> {
+    blocking(move || Ok(store().project_agents(&project))).await
+}
+
+/// Handoff (TECH_SPEC §14): capsule + rendered prompt + available targets,
+/// one call so the panel opens with everything it needs.
+#[tauri::command]
+async fn get_handoff(session_id: String) -> Result<serde_json::Value, String> {
+    blocking(move || {
+        let store = store();
+        let (provider, raw) = store
+            .resolve_session(&session_id)
+            .map_err(|e| e.to_string())?;
+        let session = provider.parse(&raw).map_err(|e| e.to_string())?;
+        let capsule = vibetrail_core::HandoffCapsule::from_session(&session);
+        let project_exists = std::path::Path::new(&capsule.project_path).is_dir();
+        Ok(serde_json::json!({
+            "prompt": capsule.prompt(),
+            "capsule": capsule,
+            "targets": store.handoff_targets(),
+            "projectExists": project_exists,
+        }))
+    })
+    .await
+}
+
+/// Continue the session in `target`: terminal agents get the prompt as a
+/// launch argument; GUI clients (Cursor) get the project opened and the
+/// prompt on the clipboard.
+#[tauri::command]
+async fn handoff_continue(session_id: String, target: String) -> Result<Option<String>, String> {
+    blocking(move || {
+        let store = store();
+        let (provider, raw) = store
+            .resolve_session(&session_id)
+            .map_err(|e| e.to_string())?;
+        let session = provider.parse(&raw).map_err(|e| e.to_string())?;
+        let capsule = vibetrail_core::HandoffCapsule::from_session(&session);
+        let prompt = capsule.prompt();
+        let spec = store
+            .handoff_spec(&target, &capsule.project_path, &prompt)
+            .map_err(|e| e.to_string())?;
+        if spec.launch == vibetrail_core::LaunchMode::GuiApp {
+            resumer::set_clipboard(&prompt).map_err(|e| e.to_string())?;
+            resumer::resume(&spec, config::load().terminal).map_err(|e| e.to_string())?;
+            return Ok(Some(
+                "App opened at the project — the handoff prompt is on your clipboard; paste it into a new chat."
+                    .to_string(),
+            ));
+        }
+        resumer::resume(&spec, config::load().terminal).map_err(|e| e.to_string())
+    })
+    .await
 }
 
 #[tauri::command]
@@ -306,6 +369,10 @@ fn main() {
             list_all_handles,
             list_session_handles,
             summarize_sessions,
+            get_project_memory,
+            get_project_agents,
+            get_handoff,
+            handoff_continue,
             get_session,
             get_message_full,
             search,

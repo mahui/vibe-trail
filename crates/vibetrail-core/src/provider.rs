@@ -4,7 +4,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
 use crate::error::Result;
-use crate::model::{Message, MessageStub, Session, SessionSummary};
+use crate::model::{AgentDef, MemoryDoc, Message, MessageStub, Session, SessionSummary};
 use crate::search::SearchHit;
 
 #[derive(Debug, Clone, Copy)]
@@ -134,5 +134,28 @@ pub trait Provider: Send + Sync {
     /// are appended to the engine's own hits.
     fn search_compressed(&self, _query: &str, _project_path: Option<&str>) -> Vec<SearchHit> {
         Vec::new()
+    }
+
+    /// Project-scoped memory the agent persists on its own (Claude Code's
+    /// memory/*.md). Read-only surface; unreadable or malformed files are
+    /// skipped, never fatal. Empty (the default) = no memory concept.
+    fn project_memory(&self, _project_path: &str) -> Vec<MemoryDoc> {
+        Vec::new()
+    }
+
+    /// Custom-agent definitions visible to this project: the project-level
+    /// roster plus the user-global one. Read-only; malformed files are
+    /// skipped. Empty (the default) = no custom-agent concept.
+    fn project_agents(&self, _project_path: &str) -> Vec<AgentDef> {
+        Vec::new()
+    }
+
+    /// Handoff target side (TECH_SPEC §14): start a NEW session in this
+    /// agent at the project, seeded with an initial prompt. Not a resume —
+    /// the prompt carries the handed-off context. None (the default) = this
+    /// agent cannot take a prompt at launch. GuiApp targets ignore the
+    /// prompt argument; the shell puts it on the clipboard instead.
+    fn launch_with_prompt(&self, _project_path: &str, _prompt: &str) -> Option<ResumeSpec> {
+        None
     }
 }

@@ -338,7 +338,7 @@ details.thinking summary { color: var(--thinking); }
   border-color: var(--border);
 }
 
-#settings-overlay {
+#settings-overlay, #handoff-overlay {
   position: fixed;
   inset: 0;
   background: color-mix(in srgb, #000 35%, transparent);
@@ -348,7 +348,7 @@ details.thinking summary { color: var(--thinking); }
   z-index: 20;
 }
 
-#settings-modal {
+#settings-modal, #handoff-modal {
   width: 560px;
   max-width: calc(100vw - 48px);
   max-height: calc(100vh - 80px);
@@ -360,6 +360,7 @@ details.thinking summary { color: var(--thinking); }
   box-shadow: 0 18px 50px rgba(0, 0, 0, 0.3);
   overflow: hidden;
 }
+#handoff-modal { width: 640px; }
 
 .settings-header {
   display: flex;
@@ -369,7 +370,7 @@ details.thinking summary { color: var(--thinking); }
   font-weight: 600;
   border-bottom: 1px solid var(--border);
 }
-#settings-close {
+#settings-close, .overlay-close {
   border: none;
   background: none;
   color: var(--text-dim);
@@ -377,9 +378,37 @@ details.thinking summary { color: var(--thinking); }
   cursor: default;
   padding: 0 2px;
 }
-#settings-close:hover { color: var(--text); }
+#settings-close:hover, .overlay-close:hover { color: var(--text); }
 
-.settings-body { padding: 4px 14px 12px; }
+/* Tab bar: one row under the header; the active tab carries the accent
+   underline flush with the bar's own border. */
+.settings-tabs {
+  display: flex;
+  gap: 2px;
+  padding: 0 10px;
+  border-bottom: 1px solid var(--border);
+}
+.settings-tab {
+  border: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px; /* underline sits on the bar's border */
+  background: none;
+  color: var(--text-dim);
+  font: inherit;
+  font-size: 12px;
+  padding: 7px 10px 6px;
+  cursor: default;
+}
+.settings-tab:hover { color: var(--text); }
+.settings-tab.active {
+  color: var(--text);
+  font-weight: 600;
+  border-bottom-color: var(--accent);
+}
+
+.settings-body { padding: 4px 14px 12px; min-height: 300px; }
+.settings-page { display: none; }
+.settings-page.active { display: block; }
 .settings-section { padding: 10px 0; }
 .settings-section + .settings-section { border-top: 1px solid var(--border); }
 .settings-section h3 { font-size: 12px; margin-bottom: 6px; }
@@ -454,7 +483,7 @@ details.thinking summary { color: var(--thinking); }
 }
 .hidden-add input:focus { border-color: var(--accent); }
 .hidden-add input::placeholder { color: var(--text-dim); opacity: 0.7; }
-.unhide-btn, #config-reveal {
+.unhide-btn, #config-reveal, #check-updates, #handoff-copy, .handoff-target {
   flex-shrink: 0;
   padding: 2px 10px;
   font: 11px inherit;
@@ -464,16 +493,10 @@ details.thinking summary { color: var(--thinking); }
   border-radius: 5px;
   cursor: default;
 }
-.unhide-btn:hover, #config-reveal:hover { border-color: var(--accent); }
+.unhide-btn:hover, #config-reveal:hover, #check-updates:hover,
+#handoff-copy:hover, .handoff-target:hover { border-color: var(--accent); }
+.handoff-target:disabled { color: var(--text-dim); border-color: var(--border); }
 
-.settings-footer {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 9px 14px;
-  border-top: 1px solid var(--border);
-  background: var(--bg-alt);
-}
 #config-path {
   flex: 1;
   min-width: 0;
@@ -483,6 +506,17 @@ details.thinking summary { color: var(--thinking); }
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* About page */
+.about-hero { padding-top: 14px; }
+.about-name { font-size: 15px; font-weight: 600; margin-bottom: 4px; }
+#about-repo {
+  color: var(--accent);
+  text-decoration: none;
+  font-size: 12px;
+}
+#about-repo:hover { text-decoration: underline; }
+.about-license { margin-left: auto; font-size: 11px; color: var(--text-dim); }
 
 .subagent-messages { padding: 6px 10px; border-top: 1px solid var(--border); }
 .subagent-line {
@@ -494,8 +528,74 @@ details.thinking summary { color: var(--thinking); }
 #project-list li.recent-row {
   border-bottom: 1px solid var(--border);
 }
+
+/* Project memory (F7): pinned row above the session list, same visual
+   language as the Recent row; docs render in the detail pane as boxes. */
+#session-list li.memory-row,
+#session-list li.agents-row {
+  border-bottom: 1px solid var(--border);
+}
+.memory-doc { margin-bottom: 10px; }
+.memory-head { display: flex; align-items: center; gap: 6px; }
+.memory-name { color: var(--text); }
+.memory-type {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-dim);
+  background: var(--bg-alt);
+  border-radius: 8px;
+  padding: 1px 7px;
+}
+.memory-desc { font-size: 11px; color: var(--text-dim); margin-bottom: 6px; }
+
+/* Handoff panel (TECH_SPEC §14) */
+.handoff-body { padding: 4px 14px 12px; }
+#handoff-prompt {
+  max-height: 320px;
+  overflow: auto;
+  padding: 8px 10px;
+  font: 11px/1.6 ui-monospace, "SF Mono", Menlo, monospace;
+  white-space: pre-wrap;
+  background: var(--bg-alt);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  user-select: text;
+}
+.handoff-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 14px;
+  border-top: 1px solid var(--border);
+  background: var(--bg-alt);
+}
+#handoff-targets { display: flex; gap: 8px; margin-left: auto; }
+#handoff-btn {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--accent);
+  font: inherit;
+  font-size: 12px;
+  padding: 4px 10px;
+  cursor: default;
+  flex-shrink: 0;
+}
+#handoff-btn:hover { border-color: var(--accent); }
 /* Session meta: time leads and reads brighter than the rest of the line. */
 .meta-time { color: var(--text); margin: 0 2px; }
+/* Snapshot "active now" dot: transcript appended within the last 2 minutes
+   as of this render. No timer — refresh re-evaluates (ADR-2). */
+.active-dot {
+  color: #16a34a;
+  font-size: 9px;
+  margin-right: 3px;
+  animation: active-pulse 1.6s ease-in-out infinite;
+}
+@keyframes active-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
 .meta-project { color: var(--text-dim); }
 
 #session-list li.notice,

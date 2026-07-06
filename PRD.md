@@ -80,6 +80,11 @@ macOS 上的 coding agent 重度用户(每天多个 session、多项目、可能
 - 侧栏项目筛选:项目名实时搜索 + agent scope bar(显式【全部】chip + 每 agent 一个 chip,加法模型:高亮=当前范围;从全部点某 agent 一次点击即单选聚焦,继续点并入多选,清空回到全部)——按任务频率优化:单选聚焦是最高频任务;纯展示层,会话级不持久化
 - App 自更新:启动后台检查 GitHub Releases,新版横幅提示、点击安装重启,永不静默;设置面板手动检查 + 版本号;minisign 验签(TECH_SPEC §7)
 - 信息架构修正:搜索范围显性化(placeholder 随选中项目联动 + 结果页 sticky 范围头部条:命中数/范围/一键搜全部/退出);侧栏置顶跨项目 Recent 视图(最新会话,行内带所属项目);会话 meta 行时间前置加亮;Resume 按钮 tooltip 按 provider 预告行为;搜索组件全 app 统一风格(语义差异由 placeholder 承载);设置 Language 归入"界面"组
+- F7 Agent 记忆面板(社区原型反馈驱动):跨 agent 聚合展示"这个项目里每个 agent 各自记住了什么"——CC 的 `memory/*.md`(MEMORY.md 索引 + frontmatter 条目)只读渲染;会话列表顶部固定入口行(有记忆才出现);CLI `vibetrail memory <project> [--json]`(TECH_SPEC §13)
+- Handoff 模板版(社区原型反馈驱动):会话 → 结构化交接胶囊(goal/branch/改动文件/最后往来)→ 复制 prompt 或一键在另一个 agent(Claude Code / Codex / Cursor)开新会话继续;纯派生零 LLM 依赖;CLI `vibetrail handoff <session-id> [--json]`(TECH_SPEC §14)
+- 快照式活跃指示(社区原型反馈驱动):mtime 2 分钟内的会话/项目行显示脉冲绿点——刷新时重算的快照,不引入 watcher/定时器(铁律不变)
+- CC agent teams 展示(社区原型反馈驱动):领队会话详情页显示团队成员盒(名字 + agent 类型);per-session 语义,白名单容错(TECH_SPEC §4.1)
+- Agent 定义清单(社区原型反馈驱动):项目级 `.claude/agents/*.md` + 用户级 `~/.claude/agents/*.md` 的自定义 agent 花名册——名字/描述/模型/工具/系统提示词(默认折叠),只读;CLI `vibetrail agents <project> [--json]`(TECH_SPEC §13)
 
 ### 非目标(v1 明确不做)
 
@@ -96,6 +101,8 @@ macOS 上的 coding agent 重度用户(每天多个 session、多项目、可能
 - Agent 工作产物(artifact)浏览:Antigravity 的 plan/task/walkthrough 提示了"transcript 浏览器 → 工作产物浏览器"的升级方向
 - 本地 embedding 语义搜索
 - MCP server:让新 agent session 程序化查询历史语料(自改进循环)
+- Handoff LLM 增强:语义级 What happened / Avoid 摘要(模板版已交付;LLM 依赖需独立 ADR,见 TECH_SPEC §14)
+- 快照式状态仪表盘(活跃点已交付;语义级分类待做):transcript 尾部启发式给出 waiting/failed 分类与跨项目 "Now" 视图,打开时刷新,明确不做实时推送(铁律不变)
 
 ## 7. 用户故事
 

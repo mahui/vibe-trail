@@ -98,6 +98,7 @@ pub trait Provider: Send + Sync {
     fn search_roots(&self, project_path: Option<&str>) -> Vec<PathBuf>;
     fn resolve_hit(&self, file: &Path, line_number: u64, line: &str, query: &str) -> Option<SearchHit>;
     fn search_compressed(&self, query: &str, project_path: Option<&str>) -> Vec<SearchHit>; // ADR-3 降级路径,默认空
+    fn project_memory(&self, project_path: &str) -> Vec<MemoryDoc>; // F7:agent 自持久化的项目记忆,只读;默认空 = 无记忆概念
 }
 
 pub struct ProviderCapabilities {
@@ -145,6 +146,7 @@ entry 解析 → 分类过滤 → 消息重组 → 树重建 → 展示转换
 
 **Resume:** `claude --resume <session-id>`(先 cd 到项目路径)。
 **链信号:** resume-fork 会把父会话历史复制进新文件,被复制行保留原 sessionId——文件头部第一个 ≠ 自身 id 的 sessionId 即链父(发现时从已读的头部字节提取,零额外 IO)。
+**Agent teams(experimental):** `~/.claude/teams/<team>/config.json`(projects 根的同级目录)经 leadSessionId 关联到会话;parse 时白名单提取 name/members(name, agentType) 进 `extensions.team`。团队是 per-session 实体("带团队的会话"),不虚构跨会话组织结构;特性无格式契约,缺失/不可解析一律静默跳过。`~/.claude/tasks/` 属短命运行时数据,不读。
 
 ### 4.2 Codex(v1.1)
 
@@ -221,7 +223,8 @@ struct Project        { id, real_path, exists, session_count, last_active, last_
 struct RawSession     { provider_id, native_id, file_path, project_path, mtime, file_size, parent_native_id? } // 可序列化:壳层持有分页句柄;parent 承载 resume/fork 链
 struct SessionSummary { id, provider_id, native_id, project_path, title, mtime, message_count, git_branch?, duration }
 struct Session        { summary, messages: Vec<Message>, extensions: Map<String, Value> }
-struct Message        { uuid, parent_uuid?, role, blocks: Vec<ContentBlock>, timestamp }
+struct Message        { uuid, alias_uuids, parent_uuid?, role, blocks: Vec<ContentBlock>, timestamp } // alias_uuids:被合并的流式 chunk uuid,搜索命中锚点用
+struct MemoryDoc      { provider_id, name, description?, doc_type?, content, file_path, mtime } // F7:frontmatter 已剥离的 markdown 正文
 enum ContentBlock     { Text{text}, ToolUse{name, input}, ToolResult{summary, truncated}, Thinking{text} }
 
 trait SearchEngine { fn search(&self, query: &str, scope: &Scope) -> Result<Vec<SearchHit>> } // grep crates 实现
@@ -239,6 +242,9 @@ vibetrail projects [--json]
 vibetrail sessions <project> [-n 20] [--provider <id>] [--json]
 vibetrail search <query> [-p <project>] [--provider <id>] [--json]
 vibetrail show <session-id> [--outline|--full] [--json]     # 默认 outline
+vibetrail memory <project> [--json]                         # F7:agent 项目记忆,只读
+vibetrail agents <project> [--json]                         # §13:自定义 agent 定义清单,只读
+vibetrail handoff <session-id> [--json]                     # §14:交接 prompt(默认)或胶囊 JSON
 vibetrail resume <session-id>
 vibetrail open [<project>]                                  # 拉起 GUI
 vibetrail config [--json]                                   # 生效配置(§12)
@@ -348,3 +354,42 @@ M1/M2 先行:CLI 是 Core 的测试驱动器,GUI 只是换皮。
 | 配置文件 | 底部常驻:config.json 路径 + Reveal in Finder | "配置即文件"的出口 |
 
 **可检查性。** `vibetrail config [--json]` 输出生效配置:配置文件路径,以及每个 provider 的 enabled、生效 root、默认 root、是否自定义、路径是否存在。`--json` schema(`ConfigReport` / `ProviderStatus`)在 Core 定义、有快照测试,与 GUI `settings_info` command 共用——设置没有第二套数据通道。
+
+## 13. 项目记忆面板(F7)
+
+**定位:跨 agent 的记忆聚合视图——"这个项目里每个 agent 各自记住了什么"。** 单个 agent 只能看到自己的记忆;VibeTrail 作为多 agent 聚合器把它们并排呈现,这是单 agent 给不了的视角。严格只读(安全约定不变):浏览 + Reveal 出口,永不写入、永不编辑。
+
+**数据源(per provider,ADR-6 纯文件读取):**
+
+| Provider | 位置 | 形态 |
+|----------|------|------|
+| Claude Code | `~/.claude/projects/<encoded-cwd>/memory/*.md` | `MEMORY.md` 索引 + 每条记忆一个带 frontmatter(name/description/metadata.type)的 markdown |
+| 其他 | 待调研(repo 内 AGENTS.md 等指令文件属项目文件,非 agent 存储,暂不纳入) | — |
+
+**协议与实现:**
+
+- `Provider::project_memory(project_path) -> Vec<MemoryDoc>`,默认空 = 该 provider 无记忆概念;store 层聚合并保持 provider 内排序(索引置首,条目按文件名)。
+- frontmatter 白名单解析(name/description/type),未知键忽略;无 frontmatter 时 name 回退文件 stem;不可读文件跳过,永不致错(规则 3 精神)。
+- 单文档读取上限 512KB(记忆是单条事实,超限属异常数据,截断展示)。
+- CC 的项目目录匹配复用 search_roots 的 cwd 匹配逻辑(`project_dirs`);无 transcript 的纯 memory 目录回退目录名解码匹配。
+
+**壳层:** GUI 在会话列表顶部固定「Agent 记忆(n)」行(仅记忆非空时出现,Recent 视图不显示),点击在详情窗按文档渲染(markdown 消毒管线复用);CLI `vibetrail memory <project> [--json]`,`MemoryDoc` schema 有快照测试。
+
+**Agents 清单(同族能力):** `Provider::project_agents(project_path) -> Vec<AgentDef>`——项目级 `<project>/.claude/agents/*.md`(repo 文件,只读浏览;与「壳层不碰 agent 存储」不冲突,这是用户自己的项目文件)+ 用户级 `~/.claude/agents/*.md`(projects 根同级)。frontmatter 同一方言(name/description/model/tools),body 即系统提示词。GUI 固定行「Agent 定义(n)」置于记忆行之下,详情按卡片渲染(scope/model 徽标,系统提示词默认折叠);CLI `vibetrail agents <project> [--json]`,`AgentDef` schema 有快照测试。
+
+## 14. Handoff(模板版已实现;LLM 增强未排期)
+
+**一句话:把一个会话变成可交接的「胶囊」,在另一个 agent 里继续。** 社区原型验证了需求方向;模板版是纯派生、零新依赖的实现。
+
+**胶囊(`HandoffCapsule`,Core `handoff.rs`):** 全部来自已有解析——goal(标题)、project_path、git_branch、previous_agent、message_count、files_touched(ToolUse input 里 path 形态键的递归提取,去重、首次触碰序、上限 20 + 溢出计数)、last_user_prompt / last_assistant_text(各自最后一个纯文本块,400 字符摘录;跳过 tool 块——胶囊要意图与状态,不要原始输出)。`prompt()` 渲染为英文交接 prompt(agent 输入,非 UI 文案)。schema 有快照测试。
+
+**目标侧协议:** `Provider::launch_with_prompt(project_path, prompt) -> Option<ResumeSpec>`,默认 None = 不能作为交接目标。CC:`claude "<prompt>"`;Codex:`codex "<prompt>"`;Cursor:GuiApp 打开项目,prompt 由壳层入剪贴板(契约:GuiApp 目标忽略 prompt 参数);Qoder/AGY 暂 None(qodercli 的 prompt 启动面待验证)。`store.handoff_targets()` 枚举可用目标;`store.handoff_spec()` 复用 resume 的路径存在性前置校验。
+
+**壳层:**
+
+- GUI:详情头部「⇄ Handoff」按钮(次级样式,与 Resume 主按钮并列)→ 面板展示 prompt 预览 + Copy + 每目标一个「Continue in <agent>」;项目路径失效时目标禁用。终端目标经既有 resumer 管线启动(prompt 是单个 argv,shell_quote 保证安全;applescript_escape 已补换行转义支撑多行 prompt);GuiApp 目标先剪贴板后启动,toast 说明粘贴步骤。
+- CLI:`vibetrail handoff <session-id> [--json]`——默认打印 prompt(管道友好:`| pbcopy`),`--json` 输出胶囊。
+
+**LLM 增强版(语义级 What happened / Avoid)——需要独立 ADR:** 引入任何 LLM 依赖(API key / 本地 `claude -p` shell-out)都触碰成本、隐私、依赖三条线,不随模板版排期。
+
+**明确不做(与铁律冲突,对社区原型的回应):** 实时进度推送、常驻监控、FS watcher(快照式刷新可覆盖 80% 场景);多人/服务端协作;自建 memory 写路径。CC agent teams(`~/.claude/teams/<team>/config.json`)是 per-session 实体,如做 Teams 视图应呈现为「带团队的会话」,不虚构常驻组织结构。

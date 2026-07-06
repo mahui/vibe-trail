@@ -145,6 +145,87 @@ pub fn search(
     Ok(())
 }
 
+/// Custom-agent roster for a project: project-level definitions plus the
+/// user-global ones, one line each (frontmatter description only — bodies
+/// are system prompts, use --json for full content).
+pub fn agents(store: &SessionStore, project: &str, json: bool) -> Result<()> {
+    let project_path = store.resolve_project(project)?;
+    let defs = store.project_agents(&project_path);
+    if json {
+        println!("{}", to_json(&defs)?);
+        return Ok(());
+    }
+    if defs.is_empty() {
+        println!(
+            "No custom agents for {}.",
+            format::abbreviate_path(&project_path)
+        );
+        return Ok(());
+    }
+    for def in defs {
+        let mut line = format!(
+            "{} {} [{}]",
+            format::pad(&def.name, 24),
+            format::pad(&def.scope, 8),
+            def.provider_id
+        );
+        if let Some(model) = &def.model {
+            line.push_str(&format!(" {model}"));
+        }
+        println!("{line}");
+        if let Some(description) = &def.description {
+            println!("    {}", format::truncate(description, 120));
+        }
+    }
+    Ok(())
+}
+
+/// Handoff (TECH_SPEC §14): print the template prompt for continuing this
+/// session in another agent. Plain print is pipe-friendly by design
+/// (`vibetrail handoff <id> | pbcopy`).
+pub fn handoff(store: &SessionStore, session_id: &str, json: bool) -> Result<()> {
+    let (provider, raw) = store.resolve_session(session_id)?;
+    let session = provider.parse(&raw)?;
+    let capsule = vibetrail_core::HandoffCapsule::from_session(&session);
+    if json {
+        println!("{}", to_json(&capsule)?);
+    } else {
+        print!("{}", capsule.prompt());
+    }
+    Ok(())
+}
+
+/// F7: agent-persisted project memory, read-only, grouped as the providers
+/// return it (each provider orders its own docs, index first).
+pub fn memory(store: &SessionStore, project: &str, json: bool) -> Result<()> {
+    let project_path = store.resolve_project(project)?;
+    let docs = store.project_memory(&project_path);
+    if json {
+        println!("{}", to_json(&docs)?);
+        return Ok(());
+    }
+    if docs.is_empty() {
+        println!(
+            "No agent memory for {}.",
+            format::abbreviate_path(&project_path)
+        );
+        return Ok(());
+    }
+    for doc in docs {
+        let mut header = format!("── [{}] {}", doc.provider_id, doc.name);
+        if let Some(doc_type) = &doc.doc_type {
+            header.push_str(&format!(" ({doc_type})"));
+        }
+        println!("{header}");
+        if let Some(description) = &doc.description {
+            println!("   {description}");
+        }
+        println!("{}", doc.content.trim_end());
+        println!();
+    }
+    Ok(())
+}
+
 pub fn show(store: &SessionStore, session_id: &str, full: bool, json: bool) -> Result<()> {
     let (provider, raw) = store.resolve_session(session_id)?;
     if full {

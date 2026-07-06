@@ -9,7 +9,9 @@ use chrono::{DateTime, Utc};
 use serde_json::{json, Value};
 
 use crate::error::{Error, Result};
-use crate::model::{ContentBlock, Message, MessageStub, Session, SessionSummary};
+use crate::model::{
+    AgentDef, ContentBlock, MemoryDoc, Message, MessageStub, Session, SessionSummary,
+};
 use crate::provider::{LaunchMode, Provider, ProviderCapabilities, RawSession, ResumeSpec};
 use crate::search::SearchHit;
 use crate::store::normalize_path;
@@ -99,6 +101,77 @@ impl ClaudeCodeProvider {
         } else {
             name.to_string()
         }
+    }
+
+    /// Store directories belonging to one project (normalized path): matched
+    /// by the cwd inside the first transcript, falling back to the decoded
+    /// directory name when a dir has no transcripts (memory-only dirs).
+    fn project_dirs(&self, normalized: &str) -> Vec<PathBuf> {
+        let Ok(dirs) = fs::read_dir(&self.root) else {
+            return Vec::new();
+        };
+        dirs.filter_map(|e| e.ok())
+            .map(|e| e.path())
+            .filter(|dir| dir.is_dir())
+            .filter(|dir| {
+                let first = fs::read_dir(dir).ok().and_then(|files| {
+                    files
+                        .filter_map(|e| e.ok())
+                        .map(|e| e.path())
+                        .find(|p| p.extension().is_some_and(|ext| ext == "jsonl"))
+                });
+                let cwd = first
+                    .and_then(|file| self.extract_cwd(&file))
+                    .unwrap_or_else(|| {
+                        self.decode_project_dir_name(
+                            &dir.file_name().unwrap_or_default().to_string_lossy(),
+                        )
+                    });
+                normalize_path(&cwd) == normalized
+            })
+            .collect()
+    }
+
+    /// Agent-team config for a session, if it led one. Teams are per-session
+    /// entities (`~/.claude/teams/<team>/config.json`, sibling of the
+    /// projects root, linked by leadSessionId) — an experimental Claude Code
+    /// feature, so this is whitelist-tolerant and absence is normal.
+    fn team_extension(&self, raw: &RawSession) -> Option<Value> {
+        let teams_dir = self.root.parent()?.join("teams");
+        for entry in fs::read_dir(teams_dir).ok()?.filter_map(|e| e.ok()) {
+            let Ok(data) = fs::read(entry.path().join("config.json")) else {
+                continue;
+            };
+            let Ok(config) = serde_json::from_slice::<Value>(&data) else {
+                continue;
+            };
+            if config.get("leadSessionId").and_then(Value::as_str) != Some(raw.native_id.as_str()) {
+                continue;
+            }
+            let members: Vec<Value> = config
+                .get("members")
+                .and_then(Value::as_array)
+                .map(|items| {
+                    items
+                        .iter()
+                        .map(|member| {
+                            json!({
+                                "name": member.get("name").and_then(Value::as_str).unwrap_or("?"),
+                                "agentType": member
+                                    .get("agentType")
+                                    .and_then(Value::as_str)
+                                    .unwrap_or("?"),
+                            })
+                        })
+                        .collect()
+                })
+                .unwrap_or_default();
+            return Some(json!({
+                "name": config.get("name").and_then(Value::as_str).unwrap_or(""),
+                "members": members,
+            }));
+        }
+        None
     }
 
     fn make_summary(&self, raw: &RawSession, result: &CcParseResult) -> SessionSummary {
@@ -299,6 +372,9 @@ impl Provider for ClaudeCodeProvider {
         if !subagents.is_empty() {
             extensions.insert("subagents".to_string(), Value::Array(subagents));
         }
+        if let Some(team) = self.team_extension(raw) {
+            extensions.insert("team".to_string(), team);
+        }
         if !result.usage.is_zero() {
             extensions.insert(
                 "usage".to_string(),
@@ -358,6 +434,34 @@ impl Provider for ClaudeCodeProvider {
         })
     }
 
+    /// Custom-agent roster: project-level `<project>/.claude/agents/*.md`
+    /// (repo files, read-only browsing) plus the user-global
+    /// `~/.claude/agents/*.md` (sibling of the projects root). Same
+    /// frontmatter dialect as memory docs.
+    fn project_agents(&self, project_path: &str) -> Vec<AgentDef> {
+        let normalized = normalize_path(project_path);
+        let mut defs = Vec::new();
+        collect_agent_defs(
+            &Path::new(&normalized).join(".claude").join("agents"),
+            "project",
+            &mut defs,
+        );
+        if let Some(parent) = self.root.parent() {
+            collect_agent_defs(&parent.join("agents"), "user", &mut defs);
+        }
+        defs
+    }
+
+    /// Handoff target: `claude "<prompt>"` starts an interactive session
+    /// seeded with the prompt.
+    fn launch_with_prompt(&self, project_path: &str, prompt: &str) -> Option<ResumeSpec> {
+        Some(ResumeSpec {
+            project_path: project_path.to_string(),
+            command: vec!["claude".to_string(), prompt.to_string()],
+            launch: LaunchMode::Terminal,
+        })
+    }
+
     /// Bounded-read title: newest `last-prompt`/`ai-title` entry from the
     /// file tail, else the first human prompt from the head. Never
     /// full-parses, so the project overview stays within its cold-start
@@ -408,30 +512,7 @@ impl Provider for ClaudeCodeProvider {
         let Some(project_path) = project_path else {
             return vec![self.root.clone()];
         };
-        let normalized = normalize_path(project_path);
-        let Ok(dirs) = fs::read_dir(&self.root) else {
-            return Vec::new();
-        };
-        dirs.filter_map(|e| e.ok())
-            .map(|e| e.path())
-            .filter(|dir| dir.is_dir())
-            .filter(|dir| {
-                let Ok(files) = fs::read_dir(dir) else {
-                    return false;
-                };
-                let first = files
-                    .filter_map(|e| e.ok())
-                    .map(|e| e.path())
-                    .find(|p| p.extension().is_some_and(|ext| ext == "jsonl"));
-                let Some(first) = first else { return false };
-                let cwd = self.extract_cwd(&first).unwrap_or_else(|| {
-                    self.decode_project_dir_name(
-                        &dir.file_name().unwrap_or_default().to_string_lossy(),
-                    )
-                });
-                normalize_path(&cwd) == normalized
-            })
-            .collect()
+        self.project_dirs(&normalize_path(project_path))
     }
 
     fn resolve_hit(
@@ -502,6 +583,145 @@ impl Provider for ClaudeCodeProvider {
             snippet,
         ))
     }
+
+    /// `<project-dir>/memory/*.md`: MEMORY.md (the index Claude Code loads
+    /// each session) first, entries alphabetically after it. Unreadable or
+    /// non-markdown files are skipped, never fatal.
+    fn project_memory(&self, project_path: &str) -> Vec<MemoryDoc> {
+        let normalized = normalize_path(project_path);
+        let mut docs = Vec::new();
+        for dir in self.project_dirs(&normalized) {
+            let Ok(entries) = fs::read_dir(dir.join("memory")) else {
+                continue;
+            };
+            let mut files: Vec<PathBuf> = entries
+                .filter_map(|e| e.ok())
+                .map(|e| e.path())
+                .filter(|p| p.is_file() && p.extension().is_some_and(|ext| ext == "md"))
+                .collect();
+            files.sort_by_key(|p| {
+                (
+                    p.file_name().is_none_or(|n| n != "MEMORY.md"),
+                    p.file_name().map(|n| n.to_os_string()),
+                )
+            });
+            for file in files {
+                if let Some(doc) = parse_memory_doc(&file) {
+                    docs.push(doc);
+                }
+            }
+        }
+        docs
+    }
+}
+
+/// Bound for one memory document; entries are single facts, so anything
+/// beyond this is truncated display-side, not an error.
+const MEMORY_DOC_CAP: usize = 512 * 1024;
+
+/// Split optional `---`-fenced frontmatter into (frontmatter, body).
+fn split_frontmatter(text: &str) -> (Option<&str>, &str) {
+    let Some(rest) = text.strip_prefix("---\n") else {
+        return (None, text);
+    };
+    match rest.split_once("\n---") {
+        // The closing fence must end its line.
+        Some((front, tail)) if tail.is_empty() || tail.starts_with('\n') => {
+            (Some(front), tail.trim_start_matches('\n'))
+        }
+        _ => (None, text),
+    }
+}
+
+/// Whitelist scan of the frontmatter for one `key:` line; tolerant of
+/// indentation (metadata sub-keys) and unknown lines.
+fn frontmatter_value<'a>(front: &'a str, key: &str) -> Option<&'a str> {
+    front.lines().find_map(|line| {
+        line.trim_start()
+            .strip_prefix(key)?
+            .strip_prefix(':')
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+    })
+}
+
+fn collect_agent_defs(dir: &Path, scope: &str, out: &mut Vec<AgentDef>) {
+    let Ok(entries) = fs::read_dir(dir) else {
+        return;
+    };
+    let mut files: Vec<PathBuf> = entries
+        .filter_map(|e| e.ok())
+        .map(|e| e.path())
+        .filter(|p| p.is_file() && p.extension().is_some_and(|ext| ext == "md"))
+        .collect();
+    files.sort();
+    for file in files {
+        if let Some(def) = parse_agent_def(&file, scope) {
+            out.push(def);
+        }
+    }
+}
+
+fn parse_agent_def(file: &Path, scope: &str) -> Option<AgentDef> {
+    let bytes = read_head(file, MEMORY_DOC_CAP)?;
+    let text = String::from_utf8_lossy(&bytes);
+    let (front, body) = split_frontmatter(&text);
+    let value = |key| {
+        front
+            .and_then(|f| frontmatter_value(f, key))
+            .map(str::to_string)
+    };
+    Some(AgentDef {
+        provider_id: PROVIDER_ID.to_string(),
+        name: value("name").unwrap_or_else(|| {
+            file.file_stem()
+                .unwrap_or_default()
+                .to_string_lossy()
+                .to_string()
+        }),
+        description: value("description"),
+        model: value("model"),
+        tools: value("tools"),
+        scope: scope.to_string(),
+        content: body.to_string(),
+        file_path: file.to_path_buf(),
+        mtime: fs::metadata(file)
+            .and_then(|m| m.modified())
+            .map(DateTime::<Utc>::from)
+            .unwrap_or(DateTime::<Utc>::UNIX_EPOCH),
+    })
+}
+
+fn parse_memory_doc(file: &Path) -> Option<MemoryDoc> {
+    let bytes = read_head(file, MEMORY_DOC_CAP)?;
+    let text = String::from_utf8_lossy(&bytes);
+    let (front, body) = split_frontmatter(&text);
+    let name = front
+        .and_then(|f| frontmatter_value(f, "name"))
+        .map(str::to_string)
+        .unwrap_or_else(|| {
+            file.file_stem()
+                .unwrap_or_default()
+                .to_string_lossy()
+                .to_string()
+        });
+    let mtime = fs::metadata(file)
+        .and_then(|m| m.modified())
+        .map(DateTime::<Utc>::from)
+        .unwrap_or(DateTime::<Utc>::UNIX_EPOCH);
+    Some(MemoryDoc {
+        provider_id: PROVIDER_ID.to_string(),
+        name,
+        description: front
+            .and_then(|f| frontmatter_value(f, "description"))
+            .map(str::to_string),
+        doc_type: front
+            .and_then(|f| frontmatter_value(f, "type"))
+            .map(str::to_string),
+        content: body.to_string(),
+        file_path: file.to_path_buf(),
+        mtime,
+    })
 }
 
 fn read_head(file: &Path, limit: usize) -> Option<Vec<u8>> {

@@ -31,6 +31,7 @@
     <main id="detail">
       <header class="pane-header" id="detail-header">
         <div id="detail-title" class="placeholder" data-i18n="app.selectSession">Select a session</div>
+        <button id="handoff-btn" class="hidden" data-i18n="handoff.btn" data-i18n-title="handoff.btnTitle" title="Hand this session off to another agent">⇄ Handoff</button>
         <button id="resume-btn" class="hidden" data-i18n="app.resume">▶ Resume</button>
       </header>
       <div id="timeline" class="scroll"></div>
@@ -42,52 +43,106 @@
         <span data-i18n="settings.title">Settings</span>
         <button id="settings-close" data-i18n-title="settings.close" title="Close">✕</button>
       </header>
+      <nav class="settings-tabs" role="tablist">
+        <button class="settings-tab active" data-tab="general" role="tab" data-i18n="settings.tabGeneral">General</button>
+        <button class="settings-tab" data-tab="sources" role="tab" data-i18n="settings.tabSources">Data sources</button>
+        <button class="settings-tab" data-tab="workspace" role="tab" data-i18n="settings.tabWorkspace">Workspace</button>
+        <button class="settings-tab" data-tab="about" role="tab" data-i18n="settings.tabAbout">About</button>
+      </nav>
       <div class="settings-body scroll">
-        <section class="settings-section">
-          <h3 data-i18n="settings.dataSources">Data sources</h3>
-          <p class="settings-note" data-i18n="settings.dataSourcesNote">
-            Where sessions are discovered. Agent stores are always read-only;
-            leave the root empty to use the default. Applies to the CLI too.
-          </p>
-          <div id="settings-providers"></div>
-        </section>
-        <section class="settings-section">
-          <h3 data-i18n="settings.resumeSection">Resume</h3>
-          <label class="settings-row">
-            <span class="settings-label" data-i18n="settings.terminal">Terminal</span>
-            <select id="terminal-select" data-i18n-title="settings.terminalTitle" title="Terminal used by Resume">
-              <option value="terminal">Terminal</option>
-              <option value="iterm2">iTerm2</option>
-              <option value="ghostty">Ghostty</option>
-              <option value="warp">Warp</option>
-            </select>
-          </label>
-          <p class="settings-note" data-i18n="settings.warpNote">
-            Warp can't run commands scriptably: VibeTrail opens the project and
-            copies the resume command to the clipboard instead.
-          </p>
-        </section>
-        <section class="settings-section">
-          <h3 data-i18n="settings.workspace">Workspace</h3>
-          <div id="settings-hidden"></div>
-        </section>
-        <section class="settings-section">
-          <h3 data-i18n="settings.interface">Interface</h3>
-          <label class="settings-row">
-            <span class="settings-label" data-i18n="settings.language">Language</span>
-            <select id="language-select">
-              <option value="auto" data-i18n="settings.languageAuto">Auto (system)</option>
-              <option value="en">English</option>
-              <option value="zh">中文</option>
-            </select>
-          </label>
-        </section>
+        <div class="settings-page active" data-page="general">
+          <section class="settings-section">
+            <h3 data-i18n="settings.resumeSection">Resume</h3>
+            <label class="settings-row">
+              <span class="settings-label" data-i18n="settings.terminal">Terminal</span>
+              <select id="terminal-select" data-i18n-title="settings.terminalTitle" title="Terminal used by Resume">
+                <option value="terminal">Terminal</option>
+                <option value="iterm2">iTerm2</option>
+                <option value="ghostty">Ghostty</option>
+                <option value="warp">Warp</option>
+              </select>
+            </label>
+            <p class="settings-note" data-i18n="settings.warpNote">
+              Warp can't run commands scriptably: VibeTrail opens the project and
+              copies the resume command to the clipboard instead.
+            </p>
+          </section>
+          <section class="settings-section">
+            <h3 data-i18n="settings.interface">Interface</h3>
+            <label class="settings-row">
+              <span class="settings-label" data-i18n="settings.language">Language</span>
+              <select id="language-select">
+                <option value="auto" data-i18n="settings.languageAuto">Auto (system)</option>
+                <option value="en">English</option>
+                <option value="zh">中文</option>
+              </select>
+            </label>
+          </section>
+        </div>
+        <div class="settings-page" data-page="sources">
+          <section class="settings-section">
+            <h3 data-i18n="settings.dataSources">Data sources</h3>
+            <p class="settings-note" data-i18n="settings.dataSourcesNote">
+              Where sessions are discovered. Agent stores are always read-only;
+              leave the root empty to use the default. Applies to the CLI too.
+            </p>
+            <div id="settings-providers"></div>
+          </section>
+        </div>
+        <div class="settings-page" data-page="workspace">
+          <section class="settings-section">
+            <h3 data-i18n="settings.workspace">Workspace</h3>
+            <div id="settings-hidden"></div>
+          </section>
+        </div>
+        <div class="settings-page" data-page="about">
+          <section class="settings-section about-hero">
+            <div class="about-name">VibeTrail <span id="app-version"></span></div>
+            <p class="settings-note" data-i18n="about.tagline">
+              Browse, search and resume your coding-agent sessions.
+            </p>
+            <p class="settings-note" data-i18n="about.unofficial">
+              Unofficial tool — not affiliated with or endorsed by any agent
+              vendor. All agent stores are read strictly read-only.
+            </p>
+          </section>
+          <section class="settings-section">
+            <div class="settings-row">
+              <span class="settings-label" data-i18n="about.updates">Updates</span>
+              <button id="check-updates" data-i18n="settings.checkUpdates">Check for updates</button>
+            </div>
+            <div class="settings-row">
+              <span class="settings-label" data-i18n="about.config">Config</span>
+              <span id="config-path" data-i18n-title="settings.configTitle" title="Settings are stored as plain, hand-editable JSON"></span>
+              <button id="config-reveal" data-i18n="settings.reveal">Reveal in Finder</button>
+            </div>
+            <div class="settings-row">
+              <span class="settings-label" data-i18n="about.source">Source</span>
+              <a id="about-repo" href="https://github.com/mahui/vibe-trail">github.com/mahui/vibe-trail</a>
+              <span class="about-license">Apache-2.0</span>
+            </div>
+          </section>
+        </div>
       </div>
-      <footer class="settings-footer">
-        <span id="config-path" data-i18n-title="settings.configTitle" title="Settings are stored as plain, hand-editable JSON"></span>
-        <span id="app-version"></span>
-        <button id="check-updates" data-i18n="settings.checkUpdates">Check for updates</button>
-        <button id="config-reveal" data-i18n="settings.reveal">Reveal in Finder</button>
+    </div>
+  </div>
+  <div id="handoff-overlay" class="hidden">
+    <div id="handoff-modal" role="dialog" aria-label="Handoff">
+      <header class="settings-header">
+        <span data-i18n="handoff.title">Handoff</span>
+        <button id="handoff-close" class="overlay-close" data-i18n-title="settings.close" title="Close">✕</button>
+      </header>
+      <div class="handoff-body scroll">
+        <p class="settings-note" data-i18n="handoff.note">
+          A fresh session in another agent continues from this capsule. The
+          prompt below is derived from the transcript — nothing is sent
+          anywhere until you launch or paste it.
+        </p>
+        <pre id="handoff-prompt" class="scroll"></pre>
+      </div>
+      <footer class="handoff-actions">
+        <button id="handoff-copy" data-i18n="handoff.copy">Copy prompt</button>
+        <span id="handoff-targets"></span>
       </footer>
     </div>
   </div>

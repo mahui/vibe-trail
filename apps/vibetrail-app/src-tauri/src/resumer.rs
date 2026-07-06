@@ -156,7 +156,7 @@ fn perform_ghostty_tab_service(directory: &str) -> bool {
         .unwrap_or(false)
 }
 
-fn set_clipboard(text: &str) -> Result<()> {
+pub fn set_clipboard(text: &str) -> Result<()> {
     use std::io::Write;
     let mut child = Command::new("/usr/bin/pbcopy")
         .stdin(std::process::Stdio::piped())
@@ -195,7 +195,12 @@ fn shell_quote(text: &str) -> String {
 }
 
 fn applescript_escape(text: &str) -> String {
-    text.replace('\\', "\\\\").replace('"', "\\\"")
+    // Newlines must survive as AppleScript \n escapes: handoff prompts are
+    // multi-line, and a raw linefeed breaks the AppleScript string literal.
+    text.replace('\\', "\\\\")
+        .replace('"', "\\\"")
+        .replace('\n', "\\n")
+        .replace('\r', "\\r")
 }
 
 fn url_encode(text: &str) -> String {

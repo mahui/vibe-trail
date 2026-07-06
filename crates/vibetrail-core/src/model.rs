@@ -1,4 +1,5 @@
 use std::collections::BTreeSet;
+use std::path::PathBuf;
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -112,6 +113,50 @@ pub struct Session {
     /// Provider-specific payloads (CC subagents, AGY artifacts, debug
     /// counters) that must not leak into the generic model.
     pub extensions: serde_json::Map<String, serde_json::Value>,
+}
+
+/// One project-scoped memory document an agent persists on its own
+/// (Claude Code's memory/*.md, instruction files, …). Strictly read-only:
+/// VibeTrail surfaces what the agent remembers, it never writes memory.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MemoryDoc {
+    pub provider_id: String,
+    /// Slug or file stem identifying the document within its provider.
+    pub name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    /// Provider-native classification (frontmatter `metadata.type` in
+    /// Claude Code: user | feedback | project | reference).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub doc_type: Option<String>,
+    /// Markdown body with any frontmatter already stripped.
+    pub content: String,
+    pub file_path: PathBuf,
+    pub mtime: DateTime<Utc>,
+}
+
+/// One custom-agent definition (roster entry): who the user has taught this
+/// agent runtime to be. Read-only, like memory — VibeTrail never writes or
+/// edits definitions.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AgentDef {
+    pub provider_id: String,
+    pub name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub model: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tools: Option<String>,
+    /// Where the definition lives: "project" (repo .claude/agents) or
+    /// "user" (the agent runtime's global agents dir).
+    pub scope: String,
+    /// System-prompt body with frontmatter stripped.
+    pub content: String,
+    pub file_path: PathBuf,
+    pub mtime: DateTime<Utc>,
 }
 
 /// Lightweight per-message stub used to render a timeline before paging in

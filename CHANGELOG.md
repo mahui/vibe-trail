@@ -1,5 +1,35 @@
 # Changelog
 
+## Unreleased
+
+- **Agent definitions panel**: the custom-agent roster a project can see —
+  repo-level `.claude/agents/*.md` plus the user-global agents dir — with
+  name, description, model, tools and the (collapsed) system prompt.
+  Pinned row under the memory row; CLI: `vibetrail agents <project>
+  [--json]`.
+- **Active-now indicator**: sessions and projects whose transcript was
+  written within the last two minutes show a pulsing green dot — a
+  snapshot re-evaluated on each refresh, no watcher or timer involved.
+- **Agent team box**: a session that led a Claude Code agent team
+  (experimental feature) shows its members (name + agent type) in the
+  detail pane. Teams are per-session; absence is normal.
+- **Handoff (template tier)**: turn any session into a structured capsule —
+  goal, branch, files touched, last exchange — and continue it in another
+  agent. Detail header gains a "⇄ Handoff" button: preview the derived
+  prompt, copy it, or launch Claude Code / Codex / Cursor at the project
+  with the prompt seeded (Cursor gets it on the clipboard). Pure
+  derivation, no LLM involved; nothing leaves the machine until you launch
+  or paste. CLI: `vibetrail handoff <session-id> [--json]`.
+- **Agent memory panel (F7)**: a read-only, cross-agent view of what each
+  agent remembers about a project. Claude Code's `memory/*.md` (MEMORY.md
+  index plus frontmatter entries) renders in the detail pane via a pinned
+  "Agent memory" row atop the session list — shown only when the project
+  actually has memory. CLI: `vibetrail memory <project> [--json]`.
+- Settings reorganized into tabs: General (resume terminal, language),
+  Data sources, Workspace, and a new About tab carrying the version,
+  update check, config file location, source link and the unofficial
+  disclaimer (previously a cramped footer).
+
 ## 0.5.1 — 2026-07-05
 
 - Clicking a search result now reliably jumps to the matched message in the

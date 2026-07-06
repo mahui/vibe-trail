@@ -7,6 +7,7 @@
 
 pub mod config;
 pub mod error;
+pub mod handoff;
 pub mod model;
 pub mod provider;
 pub mod providers;
@@ -16,7 +17,10 @@ pub mod store;
 pub(crate) mod textutil;
 
 pub use error::{Error, Result};
-pub use model::{ContentBlock, Message, MessageStub, Project, Role, Session, SessionSummary};
+pub use handoff::HandoffCapsule;
+pub use model::{
+    AgentDef, ContentBlock, MemoryDoc, Message, MessageStub, Project, Role, Session, SessionSummary,
+};
 pub use provider::{LaunchMode, Provider, ProviderCapabilities, RawSession, ResumeSpec};
 pub use providers::antigravity::AntigravityProvider;
 pub use providers::claude_code::ClaudeCodeProvider;

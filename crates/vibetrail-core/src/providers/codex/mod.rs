@@ -322,6 +322,16 @@ impl Provider for CodexProvider {
         })
     }
 
+    /// Handoff target: `codex "<prompt>"` starts an interactive session
+    /// seeded with the prompt.
+    fn launch_with_prompt(&self, project_path: &str, prompt: &str) -> Option<ResumeSpec> {
+        Some(ResumeSpec {
+            project_path: project_path.to_string(),
+            command: vec!["codex".to_string(), prompt.to_string()],
+            launch: LaunchMode::Terminal,
+        })
+    }
+
     /// First typed user prompt from the file head. Codex has no tail metadata
     /// equivalent to Claude Code's ai-title/last-prompt entries.
     fn quick_title(&self, raw: &RawSession) -> Option<String> {
